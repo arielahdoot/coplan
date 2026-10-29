@@ -94,6 +94,8 @@ export default class extends Controller {
     application = this.application
     this.me = document.querySelector("meta[name='coplan-current-user-id']")?.content || ""
     this.addTarget.hidden = !this.me
+    // A copy of the chips made while the picker was open says so.
+    this.addTarget.setAttribute("aria-expanded", this.pickerTarget.matches(":popover-open"))
     this.display()
     this.restoreFocus()
   }

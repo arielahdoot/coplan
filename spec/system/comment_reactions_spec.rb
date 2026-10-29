@@ -334,6 +334,26 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css("#{reactions} .comment-reaction[data-kind='eyes'] .comment-reaction__count", exact_text: "1", visible: :all)
   end
 
+  it "doesn't report the picker as open after a copy made while it was open replaces the chips" do
+    popover = open_thread
+    stale_thread = CoPlan::ApplicationController.render(partial: "coplan/comment_threads/thread_popover",
+      locals: { thread: thread_record, plan: plan })
+    comment.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    expect(popover).to have_css(".comment-reactions[data-version='#{comment.reactions_version}']")
+    popover.find(".comment-reactions__add").click
+    expect(page).to have_css(".comment-reactions__add[aria-expanded='true']")
+
+    page.execute_script(<<~JS, ActionView::RecordIdentifier.dom_id(thread_record), stale_thread)
+      window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
+    JS
+
+    expect(page).to have_no_css(".comment-reactions__picker:popover-open")
+    expect(page).to have_css(".comment-reactions__add[aria-expanded='false']", visible: :all)
+    expect(page).to have_no_css(".comment-reactions__add[aria-expanded='true']", visible: :all)
+  end
+
   it "keeps newer reactions when the inline editor refreshes discussions from an older response" do
     visit plan_page_path(plan)
     editor = "[data-controller~='coplan--inline-editor']"
