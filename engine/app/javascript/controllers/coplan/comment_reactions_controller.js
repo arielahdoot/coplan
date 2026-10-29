@@ -160,6 +160,13 @@ export default class extends Controller {
   // the chip went away), or keeps the picker open, when the server's copy
   // replaces these controls.
   restoreFocus() {
+    // Set by the cloned-discussion panel when it rebuilds this copy.
+    const reopen = this.element.dataset.reopenPicker
+    if (reopen !== undefined) {
+      delete this.element.dataset.reopenPicker
+      if (this.showPicker()) (this.optionFor(reopen) || this.optionTargets[0])?.focus({ preventScroll: true })
+      return
+    }
     const saved = focusAfterReplace.get(this.commentIdValue)
     if (!saved || !this.element.isConnected) return
     focusAfterReplace.delete(this.commentIdValue)

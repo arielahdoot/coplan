@@ -314,20 +314,26 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css("#{reactions} .comment-reaction[data-kind='eyes'] .comment-reaction__count", exact_text: "1", visible: :all)
   end
 
-  it "keeps working reaction controls in a cloned table discussion" do
-    token_data = CoPlan::Plans::SourceTargets.new(plan.current_content).ranges.find { |kind, *| kind == "table_cell" }
-    _, start, finish = token_data
+  def create_table_thread
+    _, start, finish = CoPlan::Plans::SourceTargets.new(plan.current_content).ranges.find { |kind, *| kind == "table_cell" }
     token = CoPlan::Plans::SourceTargets.verifier.generate(
       { "digest" => Digest::SHA256.hexdigest(plan.current_content), "kind" => "table_cell",
         "start" => start, "end" => finish, "label" => "Status" }, purpose: "comment")
-    table_thread = plan.comment_threads.create!(plan_version: plan.current_plan_version, source_token: token,
-      created_by_user: sam, status: "open")
-    table_thread.comments.create!(author_type: "human", author_id: sam.id, body_markdown: "Queued for how long?")
+    plan.comment_threads.create!(plan_version: plan.current_plan_version, source_token: token,
+      created_by_user: sam, status: "open").tap do |table_thread|
+      table_thread.comments.create!(author_type: "human", author_id: sam.id, body_markdown: "Queued for how long?")
+    end
+  end
 
+  def open_table_discussion
     visit plan_page_path(plan)
     find(".data-grid .source-thread-badge").click
-    panel = find(".source-comments", visible: true)
-    expect(panel).to have_text("Queued for how long?")
+    find(".source-comments", visible: true).tap { |panel| expect(panel).to have_text("Queued for how long?") }
+  end
+
+  it "keeps working reaction controls in a cloned table discussion" do
+    table_thread = create_table_thread
+    panel = open_table_discussion
     expect(panel).to have_css(".comment-reactions", count: 1)
 
     panel.find(".comment-reactions__add").click
@@ -357,5 +363,20 @@ RSpec.describe "Comment reactions", type: :system do
     expect(panel).to have_reaction("tada", count: 2, pressed: true)
     wait_for { table_thread.comments.first.reactions.where(user: viewer, kind: "tada").exists? }
     expect(page).to have_css(".source-comments .comment-reaction[data-kind='tada']:focus")
+  end
+
+  it "keeps the picker open in a cloned table discussion when someone else reacts" do
+    table_comment = create_table_thread.comments.first
+    panel = open_table_discussion
+    panel.find(".comment-reactions__add").click
+    expect(page).to have_css(".source-comments .comment-reactions__picker:popover-open .comment-reactions__option:focus")
+
+    create(:comment_reaction, comment: table_comment, user: sam, kind: "eyes")
+    table_comment.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(table_comment, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: table_comment.reload })
+
+    expect(panel).to have_reaction("eyes", count: 1, pressed: false)
+    expect(page).to have_css(".source-comments .comment-reactions__picker:popover-open .comment-reactions__option:focus")
   end
 end

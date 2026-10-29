@@ -279,13 +279,16 @@ export default class extends Controller {
   }
 
   // Reaction controls are rebuilt with their discussion; find the same
-  // chip (or the add button if the chip is gone) in the new copy.
+  // chip (or the add button if the chip is gone) in the new copy, and ask
+  // it to reopen an open picker.
   sameReactionControl(element) {
     const reactions = element?.closest(".comment-reactions")
     if (!reactions) return null
     const commentId = reactions.getAttribute("data-coplan--comment-reactions-comment-id-value")
     const copy = this.discussionsTarget.querySelector(`.comment-reactions[data-coplan--comment-reactions-comment-id-value="${CSS.escape(commentId)}"]`)
     if (!copy) return null
+    const option = element.closest(".comment-reactions__option")
+    if (option) copy.dataset.reopenPicker = option.dataset.kind
     const kind = element.closest(".comment-reaction")?.dataset.kind
     return (kind && copy.querySelector(`.comment-reaction[data-kind="${CSS.escape(kind)}"]:not([hidden])`)) ||
       copy.querySelector(".comment-reactions__add:not([hidden])")
