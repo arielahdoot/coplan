@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { keepNewerReactions } from "coplan/comment_reactions"
 
 export default class extends Controller {
   static targets = ["reviews", "discussion", "commentForm", "changeButton", "notice", "search", "reviewerId", "results", "assignment", "addReviewerButton", "assignButton", "managementError", "managementStatus", "assignmentError", "approval", "approvalNote", "approvalError", "approvalTitle", "approveButton", "comparison", "diff", "activity", "suggestions"]
@@ -196,6 +197,7 @@ export default class extends Controller {
       const response = await fetch(editor.getAttribute("data-coplan--inline-editor-comments-url-value"), { credentials: "same-origin", headers: { Accept: "text/html" } })
       if (response.ok) {
         const incoming = new DOMParser().parseFromString(await response.text(), "text/html")
+        keepNewerReactions(incoming)
         const id = `comment_thread_${threadId}`
         const thread = incoming.getElementById(id)
         if (thread && !document.getElementById(id)) document.getElementById("plan-threads")?.append(thread)

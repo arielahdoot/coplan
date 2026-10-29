@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { captureViewport, restoreViewport } from "coplan/viewport_anchor"
 import { captureDeckPositions, restoreDeckPositions } from "coplan/deck_state"
+import { keepNewerReactions } from "coplan/comment_reactions"
 
 // Keeps the reading page in place while the existing editor mounts on demand.
 // The server-rendered body stays available behind the editor and is refreshed
@@ -181,6 +182,7 @@ export default class extends Controller {
       if (!response.ok) return false
       const document = new DOMParser().parseFromString(await response.text(), "text/html")
       if (sequence !== this.commentsRequest) return true
+      keepNewerReactions(document)
       const nextThreads = document.querySelector("#plan-threads")
       const nextDetached = document.querySelector("#plan-detached-comments")
       const nextGeneral = document.querySelector("#plan-general-comment-list")

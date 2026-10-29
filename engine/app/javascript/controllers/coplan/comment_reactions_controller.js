@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { keepNewerReactions, reactionsVersion as version } from "coplan/comment_reactions"
 
 // Reaction chips under a comment. The server renders one copy for every
 // viewer (broadcasts have no current_user), listing who reacted; this
@@ -45,24 +46,19 @@ function redraw(commentId) {
   })
 }
 
-function version(element) {
-  return Number(element?.dataset.version)
-}
-
 // Responses and broadcasts from concurrent changes can arrive in any
-// order, and replacing a whole thread or comment brings along its own copy
-// of the chips. Turbo renders a stream a frame after announcing it, by
+// order. Turbo renders a stream a frame after announcing it, by
 // which time another may have landed, so the checks run at render time.
 document.addEventListener("turbo:before-stream-render", event => {
   const stream = event.target
   const render = event.detail.render
   event.detail.render = async streamElement => {
-    if (keepNewerReactions(stream)) await render(streamElement)
+    if (keepCurrentReactions(stream)) await render(streamElement)
   }
 })
 
 // Returns false to skip the stream.
-function keepNewerReactions(stream) {
+function keepCurrentReactions(stream) {
   const content = stream.templateElement?.content
   if (!content) return true
   const current = document.getElementById(stream.getAttribute("target") || "")
@@ -76,10 +72,7 @@ function keepNewerReactions(stream) {
     rememberFocus(current)
     return true
   }
-  content.querySelectorAll(".comment-reactions[id]").forEach(incoming => {
-    const onScreen = document.getElementById(incoming.id)
-    if (onScreen && version(incoming) < version(onScreen)) incoming.replaceWith(onScreen.cloneNode(true))
-  })
+  keepNewerReactions(content)
   return true
 }
 

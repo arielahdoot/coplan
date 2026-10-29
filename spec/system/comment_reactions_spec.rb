@@ -314,6 +314,35 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css("#{reactions} .comment-reaction[data-kind='eyes'] .comment-reaction__count", exact_text: "1", visible: :all)
   end
 
+  it "keeps newer reactions when the inline editor refreshes discussions from an older response" do
+    visit plan_page_path(plan)
+    editor = "[data-controller~='coplan--inline-editor']"
+    page.execute_script(<<~JS, editor)
+      const url = document.querySelector(arguments[0]).getAttribute("data-coplan--inline-editor-comments-url-value")
+      window.staleComments = null
+      fetch(url, { headers: { Accept: "text/html" } }).then(response => response.text()).then(html => { window.staleComments = html })
+    JS
+    wait_for { page.evaluate_script("window.staleComments !== null") }
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    comment.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    reactions = "#reactions_comment_#{comment.id}[data-version='#{comment.reactions_version}']"
+    expect(page).to have_css(reactions, visible: :all)
+
+    page.execute_script(<<~JS, editor)
+      const element = document.querySelector(arguments[0])
+      const fetch = window.fetch
+      window.fetch = async () => new Response(window.staleComments, { headers: { "Content-Type": "text/html" } })
+      window.Stimulus.getControllerForElementAndIdentifier(element, "coplan--inline-editor").refreshThreads()
+        .then(refreshed => { window.refreshed = refreshed })
+        .finally(() => { window.fetch = fetch })
+    JS
+    wait_for { page.evaluate_script("window.refreshed === true") }
+
+    expect(page).to have_css("#{reactions} .comment-reaction[data-kind='eyes'] .comment-reaction__count", exact_text: "1", visible: :all)
+  end
+
   def create_table_thread
     _, start, finish = CoPlan::Plans::SourceTargets.new(plan.current_content).ranges.find { |kind, *| kind == "table_cell" }
     token = CoPlan::Plans::SourceTargets.verifier.generate(
