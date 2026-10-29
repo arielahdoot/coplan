@@ -178,6 +178,24 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_no_css(".comment-reactions__tooltip:popover-open", visible: :all)
   end
 
+  it "hides who reacted when the page scrolls under a focused chip" do
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    popover = open_thread
+    popover.find(".comment-reactions__add").send_keys([ :shift, :tab ])
+    expect(page).to have_css(".comment-reaction[data-kind='eyes']:focus")
+    expect(page).to have_css(".comment-reactions__tooltip:popover-open", visible: :all)
+
+    page.execute_script(<<~JS)
+      const comments = document.querySelector(".thread-popover:popover-open .thread-popover__comments")
+      comments.style.maxHeight = "60px"
+      comments.style.overflowY = "auto"
+      comments.scrollTop = 40
+    JS
+
+    expect(page).to have_no_css(".comment-reactions__tooltip:popover-open", visible: :all)
+    expect(page).to have_css(".comment-reaction[data-kind='eyes']:focus")
+  end
+
   it "falls back to the saved reactions when the server rejects a change" do
     create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
     popover = open_thread

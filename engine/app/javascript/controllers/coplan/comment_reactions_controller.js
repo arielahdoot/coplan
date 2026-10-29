@@ -241,10 +241,14 @@ export default class extends Controller {
     tooltip.dataset.text = this.sentence(this.reactors(chip), this.optionFor(chip.dataset.kind)?.dataset.emoji)
     try { tooltip.showPopover() } catch {}
     this.place(tooltip, chip, { above: true })
+    // Fixed in place like the picker, so a scroll would leave it behind.
+    this.scrolled ||= () => this.hideTooltip()
+    window.addEventListener("scroll", this.scrolled, { capture: true, passive: true })
   }
 
   hideTooltip() {
     this.tooltipChip = null
+    if (this.scrolled) window.removeEventListener("scroll", this.scrolled, { capture: true })
     if (!this.hasTooltipTarget) return
     try { this.tooltipTarget.hidePopover() } catch {}
   }
