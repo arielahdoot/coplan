@@ -4,7 +4,8 @@ ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
   actions :index, :show
   config.batch_actions = false
 
-  kind_label = proc { |reaction| "#{CoPlan::CommentReaction.emoji_for(reaction.kind)} #{reaction.kind}" }
+  # Rows outlive the kinds offered, so show a retired kind by name alone.
+  kind_label = proc { |reaction| [ CoPlan::CommentReaction::KINDS.dig(reaction.kind, :emoji), reaction.kind ].compact.join(" ") }
 
   filter :comment_id
   filter :user

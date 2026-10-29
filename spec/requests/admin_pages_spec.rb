@@ -70,6 +70,18 @@ RSpec.describe "Admin pages", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
+  it "lists a comment reaction whose kind is no longer offered" do
+    reaction = create(:comment_reaction)
+    reaction.update_column(:kind, "retired")
+
+    get admin_comment_reactions_path
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("retired")
+
+    get admin_comment_reaction_path(reaction)
+    expect(response).to have_http_status(:ok)
+  end
+
   records.each do |route_key, create_record|
     context route_key do
       let!(:record) { instance_exec(&create_record) }
