@@ -265,6 +265,25 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_reaction("eyes", count: 1, pressed: false)
   end
 
+  it "keeps newer reactions when an older render of the whole thread arrives" do
+    popover = open_thread
+    stale_thread = CoPlan::ApplicationController.render(partial: "coplan/comment_threads/thread_popover",
+      locals: { thread: thread_record, plan: plan })
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    comment.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    expect(popover).to have_reaction("eyes", count: 1, pressed: false)
+
+    page.execute_script(<<~JS, ActionView::RecordIdentifier.dom_id(thread_record), stale_thread)
+      window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
+    JS
+
+    reactions = "#comment_thread_#{thread_record.id}_popover " \
+      "#reactions_comment_#{comment.id}[data-version='#{comment.reactions_version}']"
+    expect(page).to have_css("#{reactions} .comment-reaction[data-kind='eyes'] .comment-reaction__count", exact_text: "1", visible: :all)
+  end
+
   it "keeps working reaction controls in a cloned table discussion" do
     token_data = CoPlan::Plans::SourceTargets.new(plan.current_content).ranges.find { |kind, *| kind == "table_cell" }
     _, start, finish = token_data

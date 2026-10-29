@@ -13,6 +13,7 @@ import { Controller } from "@hotwired/stimulus"
 const queues = new Map()
 const pending = new Map()
 const focusAfterReplace = new Map()
+const newest = new Map()
 let sequence = 0
 const NAME_LIMIT = 10
 
@@ -39,10 +40,27 @@ export default class extends Controller {
   static targets = ["chip", "add", "picker", "option", "tooltip", "chipTemplate"]
 
   connect() {
+    if (this.supersede()) return
     this.me = document.querySelector("meta[name='coplan-current-user-id']")?.content || ""
     this.addTarget.hidden = !this.me
     this.display()
     this.restoreFocus()
+  }
+
+  // Whole-thread and whole-comment replacements carry their own copy of
+  // these chips, which can be older than the one on screen. Keep the
+  // newest server copy of each comment's chips and put it back in place
+  // of an older one. Copies in cloned discussions follow the original.
+  supersede() {
+    if (!this.element.id) return false
+    const version = Number(this.element.dataset.version)
+    const known = newest.get(this.commentIdValue)
+    if (known && known.version > version) {
+      this.element.replaceWith(known.element.cloneNode(true))
+      return true
+    }
+    newest.set(this.commentIdValue, { version, element: this.element.cloneNode(true) })
+    return false
   }
 
   disconnect() {
