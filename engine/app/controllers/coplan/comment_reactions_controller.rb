@@ -22,8 +22,11 @@ module CoPlan
       if reacted
         begin
           @comment.reactions.find_or_create_by!(user: current_user, kind: kind)
-        rescue ActiveRecord::RecordNotUnique
-          # A concurrent request already added it.
+        rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+          # A concurrent request added it between the lookup and the insert;
+          # depending on timing that surfaces as the uniqueness validation
+          # or as the unique index. The kind was validated above.
+          raise unless @comment.reactions.exists?(user: current_user, kind: kind)
         end
       else
         @comment.reactions.where(user: current_user, kind: kind).delete_all

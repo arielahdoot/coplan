@@ -33,6 +33,17 @@ RSpec.describe "Comment reactions", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
+  it "treats a concurrent add of the same reaction as success" do
+    create(:comment_reaction, comment: comment, user: bob, kind: "thumbs_up")
+    # Another request inserts the row after this request's lookup misses it.
+    allow_any_instance_of(ActiveRecord::Relation).to receive(:find_by).and_wrap_original do |original, *args, **kwargs|
+      original.receiver.klass == CoPlan::CommentReaction ? nil : original.call(*args, **kwargs)
+    end
+
+    expect { react }.not_to change(CoPlan::CommentReaction, :count)
+    expect(response).to have_http_status(:ok)
+  end
+
   it "removes only the signed-in person's reaction" do
     create(:comment_reaction, comment: comment, user: bob, kind: "rocket")
     create(:comment_reaction, comment: comment, user: alice, kind: "rocket")
