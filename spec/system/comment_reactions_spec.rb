@@ -429,6 +429,8 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_css(".comment-reactions[data-version='#{comment.reactions_version}']")
     popover.find(".comment-reactions__add").click
     expect(page).to have_css(".comment-reactions__add[aria-expanded='true']")
+    # With focus in the picker, the replacement would reopen it.
+    page.execute_script("document.activeElement.blur()")
 
     page.execute_script(<<~JS, ActionView::RecordIdentifier.dom_id(thread_record), stale_thread)
       window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
