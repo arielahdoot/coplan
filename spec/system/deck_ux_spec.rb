@@ -141,6 +141,24 @@ RSpec.describe "Deck UX", type: :system do
     send_keys(:escape)
   end
 
+  it "closes a reaction picker before the thread it opened from during a show" do
+    thread = plan.comment_threads.create!(plan_version: plan.current_plan_version, anchor_text: "earns its layout",
+      anchor_occurrence: 1, created_by_user: user, status: "open")
+    thread.comments.create!(author_type: "human", author_id: user.id, body_markdown: "Which shapes count?")
+    visit plan_page_path(plan)
+    find(".deck-toolbar__present").click
+    expect(page).to have_css(".deck--presenting")
+    page.execute_script("document.getElementById(arguments[0]).showPopover()", "comment_thread_#{thread.id}_popover")
+    find("#comment_thread_#{thread.id}_popover .comment-reactions__add").click
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+
+    send_keys(:escape)
+
+    expect(page).to have_no_css(".comment-reactions__picker:popover-open")
+    expect(page).to have_css("#comment_thread_#{thread.id}_popover:popover-open")
+    expect(page).to have_css(".deck--presenting")
+  end
+
   it "keeps the reader's slide when live content replaces the document" do
     visit plan_page_path(plan)
     find(".deck-toolbar__step--next").click

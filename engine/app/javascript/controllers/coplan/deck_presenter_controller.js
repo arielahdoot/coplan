@@ -279,7 +279,7 @@ export default class extends Controller {
         // Escape should undo that, not the whole show. (The browser drops
         // fullscreen on this keypress anyway, uncancelably — exiting here
         // just makes the same thing happen on purpose.)
-        if (this._dismissForeignPopovers() || this._stowPen()) return
+        if (this._closeReactionPicker() || this._dismissForeignPopovers() || this._stowPen()) return
         if (document.fullscreenElement === this.element) {
           document.exitFullscreen().catch(() => {})
           return
@@ -306,6 +306,16 @@ export default class extends Controller {
       dismissed = true
     })
     return dismissed
+  }
+
+  // A reaction picker opens in front of its thread, so it goes first and
+  // leaves the thread open. Returns whether there was one to close.
+  _closeReactionPicker() {
+    const picker = document.querySelector(".comment-reactions__picker:popover-open")
+    if (!picker) return false
+
+    picker.hidePopover()
+    return true
   }
 
   // Puts the pen away. Returns whether there was a pen out to put away.
