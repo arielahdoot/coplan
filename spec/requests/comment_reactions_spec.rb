@@ -38,6 +38,16 @@ RSpec.describe "Comment reactions", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
+  it "neither bumps the version nor broadcasts when nothing changes" do
+    create(:comment_reaction, comment: comment, user: bob, kind: "heart")
+    expect(CoPlan::Broadcaster).not_to receive(:replace_to)
+
+    expect { react(kind: "heart") }.not_to change { comment.reload.reactions_version }
+    expect { react(kind: "rocket", reacted: false) }.not_to change { comment.reload.reactions_version }
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Bob Baker reacted with heart")
+  end
+
   it "treats a concurrent add of the same reaction as success" do
     create(:comment_reaction, comment: comment, user: bob, kind: "thumbs_up")
     # Another request inserts the row after this request's lookup misses it.

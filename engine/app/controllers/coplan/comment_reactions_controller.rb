@@ -19,25 +19,29 @@ module CoPlan
         return
       end
 
-      if reacted
-        begin
-          @comment.reactions.find_or_create_by!(user: current_user, kind: kind)
-        rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-          # A concurrent request added it between the lookup and the insert;
-          # depending on timing that surfaces as the uniqueness validation
-          # or as the unique index. The kind was validated above.
-          raise unless @comment.reactions.exists?(user: current_user, kind: kind)
-        end
-      else
-        @comment.reactions.where(user: current_user, kind: kind).delete_all
-      end
+      changed =
+        if reacted
+          begin
+            @comment.reactions.find_or_create_by!(user: current_user, kind: kind).previously_new_record?
+          rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+            # A concurrent request added it between the lookup and the insert;
+            # depending on timing that surfaces as the uniqueness validation
+            # or as the unique index. The kind was validated above.
+            raise unless @comment.reactions.exists?(user: current_user, kind: kind)
 
-      @comment.bump_reactions_version!
+            false
+          end
+        else
+          @comment.reactions.where(user: current_user, kind: kind).delete_all.positive?
+        end
+
+      @comment.bump_reactions_version! if changed
       @comment.reload
       CommentReaction.preload_for(@comment)
       target = ActionView::RecordIdentifier.dom_id(@comment, :reactions)
       locals = { comment: @comment }
-      Broadcaster.replace_to(@plan, target: target, partial: "coplan/comments/reactions", locals: locals)
+      # Repeats and retries change nothing, so other viewers don't hear about them.
+      Broadcaster.replace_to(@plan, target: target, partial: "coplan/comments/reactions", locals: locals) if changed
       html = render_to_string(partial: "coplan/comments/reactions", locals: locals, formats: [ :html ])
 
       respond_to do |format|
