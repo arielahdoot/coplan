@@ -404,6 +404,31 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_no_css(".comment-reactions__add[aria-expanded='true']", visible: :all)
   end
 
+  it "keeps the chips on screen when a whole-thread render of the same version arrives" do
+    popover = open_thread
+    # A render reads the version before the reactions, so one that ran
+    # between a change's bump and its insert has the same version but not
+    # the reaction.
+    comment.bump_reactions_version!
+    same_version_thread = CoPlan::ApplicationController.render(partial: "coplan/comment_threads/thread_popover",
+      locals: { thread: thread_record.reload, plan: plan })
+    expect(same_version_thread).to include(%(data-version="#{comment.reload.reactions_version}"))
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    expect(popover).to have_reaction("eyes", count: 1, pressed: false)
+
+    thread_id = ActionView::RecordIdentifier.dom_id(thread_record)
+    page.execute_script(<<~JS, thread_id, same_version_thread)
+      window.threadBeforeRender = document.getElementById(arguments[0])
+      window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
+    JS
+    wait_for { page.evaluate_script("document.getElementById(arguments[0]) !== window.threadBeforeRender", thread_id) }
+
+    reactions = "#comment_thread_#{thread_record.id}_popover #reactions_comment_#{comment.id}"
+    expect(page).to have_css("#{reactions} .comment-reaction[data-kind='eyes'] .comment-reaction__count", exact_text: "1", visible: :all)
+  end
+
   it "keeps newer reactions when the inline editor refreshes discussions from an older response" do
     visit plan_page_path(plan)
     editor = "[data-controller~='coplan--inline-editor']"
