@@ -358,10 +358,6 @@
   cursor: pointer;
 }
 
-.comment-reaction[hidden] {
-  display: none;
-}
-
 .comment-reaction:hover {
   border-color: var(--color-border-strong);
   background: var(--color-interaction-hover-bg);
