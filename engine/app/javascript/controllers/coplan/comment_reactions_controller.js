@@ -67,8 +67,12 @@ function keepNewerReactions(stream) {
   if (!content) return true
   const current = document.getElementById(stream.getAttribute("target") || "")
   if (current?.matches(".comment-reactions")) {
-    // The same version shows the same reactions.
-    if (version(content.firstElementChild) <= version(current)) return false
+    // The same version shows the same reactions. A response skipped here
+    // may still have settled a choice, so redraw without it.
+    if (version(content.firstElementChild) <= version(current)) {
+      redraw(current.getAttribute(COMMENT_ID))
+      return false
+    }
     rememberFocus(current)
     return true
   }
@@ -144,9 +148,6 @@ export default class extends Controller {
       throw Object.assign(new Error(reason), { reason })
     }).then(html => {
       settle(commentId, kind, seq)
-      // The response may be skipped as no newer than the chips on screen,
-      // so redraw them without this choice now.
-      redraw(commentId)
       window.Turbo.renderStreamMessage(html)
     }).catch(error => {
       settle(commentId, kind, seq)

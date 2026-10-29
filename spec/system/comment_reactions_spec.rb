@@ -257,6 +257,28 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_no_css(".comment-reaction", text: "🚀")
   end
 
+  it "keeps focus on a new chip while its saved copy arrives" do
+    popover = open_thread
+    target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
+    page.execute_script(<<~JS)
+      window.fetch = () => new Promise(resolve => { window.answerReaction = body => resolve(new Response(body, { headers: { "Content-Type": "text/vnd.turbo-stream.html" } })) })
+    JS
+    popover.find(".comment-reactions__add").click
+    find(".comment-reactions__picker:popover-open .comment-reactions__option", text: "🚀").click
+    expect(popover).to have_reaction("rocket", count: 1, pressed: true)
+    page.execute_script("document.querySelector('.thread-popover:popover-open .comment-reaction[data-kind=rocket]').focus()")
+
+    create(:comment_reaction, comment: comment, user: viewer, kind: "rocket")
+    comment.bump_reactions_version!
+    saved = CoPlan::ApplicationController.render(partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    page.execute_script(<<~JS, target, saved)
+      window.answerReaction(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
+    JS
+
+    expect(popover).to have_css(%(.comment-reactions[data-version="#{comment.reactions_version}"]))
+    expect(page).to have_css(".comment-reaction[data-kind='rocket'][aria-pressed='true']:focus")
+  end
+
   it "ignores a replacement older than the chips on screen" do
     popover = open_thread
     target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
