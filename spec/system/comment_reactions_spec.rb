@@ -258,6 +258,25 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css(".thread-popover:popover-open")
   end
 
+  it "keeps the picker open when something unrelated on the page scrolls" do
+    popover = open_thread
+    page.execute_script(<<~JS)
+      const scroller = document.createElement("div")
+      scroller.id = "unrelated-scroller"
+      scroller.style.cssText = "position: fixed; bottom: 0; left: 0; width: 100px; height: 40px; overflow: auto"
+      scroller.innerHTML = '<div style="height: 400px"></div>'
+      document.body.append(scroller)
+    JS
+    popover.find(".comment-reactions__add").click
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+
+    page.execute_script('document.getElementById("unrelated-scroller").scrollTop = 200')
+    wait_for { page.evaluate_script('document.getElementById("unrelated-scroller").scrollTop') == 200 }
+    sleep 0.1
+
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+  end
+
   it "keeps the picker open when someone else's reaction arrives" do
     popover = open_thread
     popover.find(".comment-reactions__add").click

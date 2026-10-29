@@ -287,10 +287,13 @@ export default class extends Controller {
     if (!open && this.pickerTarget.contains(document.activeElement)) this.addTarget.focus({ preventScroll: true })
   }
 
-  // The picker is fixed in place, so any scroll (including one inside a
-  // comment window, which doesn't bubble) or resize leaves it behind.
+  // The picker is fixed in place, so a resize, or a scroll of the page or
+  // of anything holding its button (including a comment window, whose
+  // scroll doesn't bubble), leaves it behind.
   closeOnMove() {
-    this.moved ||= () => this.closePicker()
+    this.moved ||= event => {
+      if (event.type === "resize" || event.target === document || event.target.contains?.(this.addTarget)) this.closePicker()
+    }
     window.addEventListener("scroll", this.moved, { capture: true, passive: true })
     window.addEventListener("resize", this.moved)
   }
