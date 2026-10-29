@@ -1,4 +1,6 @@
 ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
+  includes :comment, :user
+
   # Read-only: removing a reaction here would leave open pages showing it.
   # People remove their own reactions from the comment.
   actions :index, :show
