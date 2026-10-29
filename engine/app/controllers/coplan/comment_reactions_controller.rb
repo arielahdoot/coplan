@@ -29,7 +29,8 @@ module CoPlan
         end
       end
     rescue Comment::DeletedError
-      render plain: "You can't react to a deleted comment.", status: :unprocessable_content
+      # Raised inside a format, which has already chosen its content type.
+      render plain: "You can't react to a deleted comment.", status: :unprocessable_content, content_type: "text/plain"
     end
 
     private

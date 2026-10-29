@@ -111,6 +111,8 @@ RSpec.describe "Comment reactions", type: :request do
 
     expect { react }.not_to change(CoPlan::CommentReaction, :count)
     expect(response).to have_http_status(:unprocessable_content)
+    expect(response.media_type).to eq("text/plain")
+    expect(response.body).to eq("You can't react to a deleted comment.")
   end
 
   it "rejects a signed-out request" do
