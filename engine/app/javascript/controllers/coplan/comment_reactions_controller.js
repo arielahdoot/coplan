@@ -132,7 +132,7 @@ export default class extends Controller {
     body.append("reacted", reacted)
     enqueue(commentId, async () => {
       const response = await fetch(url, {
-        method: "PATCH", body,
+        method: "PATCH", body, signal: AbortSignal.timeout(15000),
         headers: { "Accept": "text/vnd.turbo-stream.html", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content }
       })
       const type = response.headers.get("Content-Type") || ""

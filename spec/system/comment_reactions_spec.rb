@@ -187,6 +187,27 @@ RSpec.describe "Comment reactions", type: :system do
     expect(comment.reactions.where(user: viewer, kind: "heart")).to exist
   end
 
+  it "gives up on a stalled request so later reactions on the comment still save" do
+    create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
+    popover = open_thread
+    page.execute_script(<<~JS)
+      const fetch = window.fetch
+      window.fetch = (url, options) => {
+        window.fetch = fetch
+        return new Promise((_, reject) => options.signal?.addEventListener("abort", () => reject(options.signal.reason)))
+      }
+    JS
+
+    chip(popover, "❤️").click
+    popover.find(".comment-reactions__add").click
+    find(".comment-reactions__picker:popover-open .comment-reactions__option", text: "👍").click
+
+    expect(page).to have_css(".toasts__toast", text: "Couldn't save your reaction. Please try again.", wait: 20)
+    expect(popover).to have_reaction("heart", count: 1, pressed: true)
+    expect(popover).to have_reaction("thumbs_up", count: 1, pressed: true)
+    wait_for { comment.reactions.where(user: viewer, kind: "thumbs_up").exists? }
+  end
+
   [
     [ "offline", "Promise.reject(new TypeError('Failed to fetch'))" ],
     [ "refused by the framework", "Promise.resolve(new Response('<html>Invalid authenticity token</html>', " \
