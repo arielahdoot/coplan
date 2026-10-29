@@ -145,6 +145,20 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_no_css(".comment-reaction[data-kind='thumbs_up']")
   end
 
+  it "keeps the saved reactions and says so when answered with a sign-in page" do
+    create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
+    popover = open_thread
+    page.execute_script(<<~JS)
+      window.fetch = () => Promise.resolve(new Response("<main>Sign in</main>", { headers: { "Content-Type": "text/html" } }))
+    JS
+
+    chip(popover, "❤️").click
+
+    expect(page).to have_css(".toasts__toast", text: "Couldn't save your reaction. Please try again.")
+    expect(popover).to have_reaction("heart", count: 1, pressed: true)
+    expect(comment.reactions.where(user: viewer, kind: "heart")).to exist
+  end
+
   it "shows another person's reaction live" do
     popover = open_thread
 

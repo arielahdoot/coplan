@@ -80,6 +80,8 @@ export default class extends Controller {
         headers: { "Accept": "text/vnd.turbo-stream.html", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content }
       })
       if (!response.ok) throw new Error(response.status === 422 ? await response.text() : "")
+      // A signed-out request is redirected to the HTML sign-in page.
+      if (!response.headers.get("Content-Type")?.startsWith("text/vnd.turbo-stream.html")) throw new Error("")
       return response.text()
     }).then(html => {
       settle(commentId, kind, seq)
