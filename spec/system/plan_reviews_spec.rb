@@ -92,6 +92,22 @@ RSpec.describe "Plan discussion and approval", type: :system do
     expect(page).to have_field("Public review comment", with: "Can we clarify this boundary?", enable_aria_label: true)
   end
 
+  it "keeps the change request open when Escape closes a reaction picker" do
+    thread = create(:comment_thread, :with_anchor, plan: plan, created_by_user: author)
+    create(:comment, comment_thread: thread, author_id: author.id)
+    visit plan_page_path(plan)
+    within(".review-tray") { click_button "Request changes" }
+    expect(page).to have_field("Public review comment", enable_aria_label: true)
+
+    find("mark[data-thread-id='comment_thread_#{thread.id}']").click
+    find(".thread-popover:popover-open .comment-reactions__add").click
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+    page.send_keys(:escape)
+
+    expect(page).to have_no_css(".comment-reactions__picker:popover-open")
+    expect(page).to have_field("Public review comment", enable_aria_label: true)
+  end
+
   [ [ "Request another review", false ], [ "Remove request", true ] ].each do |action, failed|
     it "keeps reviewer-update progress visible for #{action}", :review_interactions do
       sign_in_browser(author)
