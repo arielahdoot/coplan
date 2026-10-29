@@ -100,6 +100,15 @@ RSpec.describe CoPlan::Comment, "#set_reaction!", type: :model do
     expect(comment.reactions).to be_empty
   end
 
+  it "refuses a comment destroyed since it was loaded" do
+    stale = CoPlan::Comment.find(comment.id)
+    comment.destroy!
+
+    expect { stale.set_reaction!(user: user, kind: "heart", reacted: true) }
+      .to raise_error(CoPlan::Comment::DeletedError)
+    expect(CoPlan::CommentReaction.where(comment_id: comment.id)).to be_empty
+  end
+
   it "keeps the version when the change fails" do
     allow(comment.reactions).to receive(:find_or_create_by!).and_raise(ActiveRecord::StatementInvalid)
 

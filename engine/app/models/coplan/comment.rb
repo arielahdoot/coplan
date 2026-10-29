@@ -62,10 +62,9 @@ module CoPlan
     # before it saved.
     def set_reaction!(user:, kind:, reacted:)
       transaction do
-        bump_reactions_version!
-        # Checked under the lock, so a comment deleted a moment ago can't
-        # gain a reaction from a request that loaded it before.
-        raise DeletedError if self.class.where(id: id).where.not(deleted_at: nil).exists?
+        # Checked under the lock, so a comment deleted or destroyed a moment
+        # ago can't gain a reaction from a request that loaded it before.
+        raise DeletedError unless bump_reactions_version! == 1 && self.class.where(id: id, deleted_at: nil).exists?
         if reacted
           reactions.find_or_create_by!(user: user, kind: kind)
         else
