@@ -13,9 +13,11 @@ import { Controller } from "@hotwired/stimulus"
 const queues = new Map()
 const pending = new Map()
 const focusAfterReplace = new Map()
-const newest = new Map()
 let sequence = 0
+let application
 const NAME_LIMIT = 10
+const IDENTIFIER = "coplan--comment-reactions"
+const COMMENT_ID = `data-${IDENTIFIER}-comment-id-value`
 
 function enqueue(key, task) {
   const run = (queues.get(key) || Promise.resolve()).catch(() => {}).then(task)
@@ -35,32 +37,68 @@ function settle(commentId, kind, seq) {
   if (choices?.size === 0) pending.delete(commentId)
 }
 
+// Redraws every copy of a comment's reactions, including cloned
+// discussions that don't receive Turbo Stream updates themselves.
+function redraw(commentId) {
+  document.querySelectorAll(`[${COMMENT_ID}="${CSS.escape(commentId)}"]`).forEach(element => {
+    application?.getControllerForElementAndIdentifier(element, IDENTIFIER)?.display()
+  })
+}
+
+function version(element) {
+  return Number(element?.dataset.version)
+}
+
+// Responses and broadcasts from concurrent changes can arrive in any
+// order, and replacing a whole thread or comment brings along its own copy
+// of the chips. Turbo renders a stream a frame after announcing it, by
+// which time another may have landed, so the checks run at render time.
+document.addEventListener("turbo:before-stream-render", event => {
+  const stream = event.target
+  const render = event.detail.render
+  event.detail.render = async streamElement => {
+    if (keepNewerReactions(stream)) await render(streamElement)
+  }
+})
+
+// Returns false to skip the stream.
+function keepNewerReactions(stream) {
+  const content = stream.templateElement?.content
+  if (!content) return true
+  const current = document.getElementById(stream.getAttribute("target") || "")
+  if (current?.matches(".comment-reactions")) {
+    // The same version shows the same reactions.
+    if (version(content.firstElementChild) <= version(current)) return false
+    rememberFocus(current)
+    return true
+  }
+  content.querySelectorAll(".comment-reactions[id]").forEach(incoming => {
+    const onScreen = document.getElementById(incoming.id)
+    if (onScreen && version(incoming) < version(onScreen)) incoming.replaceWith(onScreen.cloneNode(true))
+  })
+  return true
+}
+
+// Notes which control has focus so the replacement can take it back.
+function rememberFocus(reactions) {
+  const focused = document.activeElement
+  if (!reactions.contains(focused)) return
+  focusAfterReplace.set(reactions.getAttribute(COMMENT_ID), {
+    kind: focused.closest(".comment-reaction, .comment-reactions__option")?.dataset.kind,
+    inPicker: Boolean(focused.closest(".comment-reactions__picker"))
+  })
+}
+
 export default class extends Controller {
   static values = { url: String, commentId: String }
   static targets = ["chip", "add", "picker", "option", "tooltip", "chipTemplate"]
 
   connect() {
-    if (this.supersede()) return
+    application = this.application
     this.me = document.querySelector("meta[name='coplan-current-user-id']")?.content || ""
     this.addTarget.hidden = !this.me
     this.display()
     this.restoreFocus()
-  }
-
-  // Whole-thread and whole-comment replacements carry their own copy of
-  // these chips, which can be older than the one on screen. Keep the
-  // newest server copy of each comment's chips and put it back in place
-  // of an older one. Copies in cloned discussions follow the original.
-  supersede() {
-    if (!this.element.id) return false
-    const version = Number(this.element.dataset.version)
-    const known = newest.get(this.commentIdValue)
-    if (known && known.version > version) {
-      this.element.replaceWith(known.element.cloneNode(true))
-      return true
-    }
-    newest.set(this.commentIdValue, { version, element: this.element.cloneNode(true) })
-    return false
   }
 
   disconnect() {
@@ -88,7 +126,7 @@ export default class extends Controller {
     const url = this.urlValue
     const seq = ++sequence
     choicesFor(commentId).set(kind, { reacted, seq })
-    this.displayAll(commentId)
+    redraw(commentId)
 
     const body = new FormData()
     body.append("kind", kind)
@@ -108,40 +146,13 @@ export default class extends Controller {
       settle(commentId, kind, seq)
       // The response may be skipped as no newer than the chips on screen,
       // so redraw them without this choice now.
-      this.displayAll(commentId)
+      redraw(commentId)
       window.Turbo.renderStreamMessage(html)
     }).catch(error => {
       settle(commentId, kind, seq)
-      this.displayAll(commentId)
+      redraw(commentId)
       this.toast(error.reason || "Couldn't save your reaction. Please try again.")
     })
-  }
-
-  // Responses and broadcasts from concurrent changes can arrive in any
-  // order. Skip a replacement that isn't newer than the chips already on
-  // screen (the same version shows the same reactions), and note which
-  // control has focus so the new copy can take it back. Turbo renders a
-  // frame after this event, by which time another replacement may have
-  // landed, so both checks run at render time.
-  beforeStream(event) {
-    const id = this.element.id
-    const stream = event.target
-    if (!id || stream.getAttribute("target") !== id) return
-    const commentId = this.commentIdValue
-    const incoming = Number(stream.templateContent?.firstElementChild?.dataset.version)
-    const render = event.detail.render
-    event.detail.render = async streamElement => {
-      const current = document.getElementById(id)
-      if (current && incoming <= Number(current.dataset.version)) return
-      const focused = document.activeElement
-      if (current?.contains(focused)) {
-        focusAfterReplace.set(commentId, {
-          kind: focused.closest(".comment-reaction, .comment-reactions__option")?.dataset.kind,
-          inPicker: Boolean(focused.closest(".comment-reactions__picker"))
-        })
-      }
-      await render(streamElement)
-    }
   }
 
   // A keyboard user keeps focus on the same chip (or on the add button if
@@ -158,14 +169,6 @@ export default class extends Controller {
     const chip = saved.kind && this.chipFor(saved.kind)
     const target = chip && !chip.hidden ? chip : this.addTarget
     if (!target.hidden) target.focus({ preventScroll: true })
-  }
-
-  // Redraws every copy of this comment's reactions, including cloned
-  // discussions that don't receive Turbo Stream updates themselves.
-  displayAll(commentId) {
-    document.querySelectorAll(`[data-coplan--comment-reactions-comment-id-value="${CSS.escape(commentId)}"]`).forEach(element => {
-      this.application.getControllerForElementAndIdentifier(element, this.identifier)?.display()
-    })
   }
 
   display() {
