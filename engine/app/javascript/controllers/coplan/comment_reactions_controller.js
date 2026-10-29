@@ -12,6 +12,7 @@ import { Controller } from "@hotwired/stimulus"
 // to the confirmed state. Requests for one comment run in order.
 const queues = new Map()
 const pending = new Map()
+const focusAfterReplace = new Map()
 let sequence = 0
 const NAME_LIMIT = 10
 
@@ -41,6 +42,7 @@ export default class extends Controller {
     this.me = document.querySelector("meta[name='coplan-current-user-id']")?.content || ""
     this.addTarget.hidden = !this.me
     this.display()
+    this.restoreFocus()
   }
 
   disconnect() {
@@ -96,7 +98,25 @@ export default class extends Controller {
     const stream = event.target
     if (!this.element.id || stream.getAttribute("target") !== this.element.id) return
     const incoming = stream.templateContent?.firstElementChild
-    if (Number(incoming?.dataset.renderedAt) < Number(this.element.dataset.renderedAt)) event.preventDefault()
+    if (Number(incoming?.dataset.renderedAt) < Number(this.element.dataset.renderedAt)) {
+      event.preventDefault()
+      return
+    }
+    const focused = document.activeElement
+    if (!this.element.contains(focused)) return
+    const chip = focused.closest(".comment-reaction")
+    focusAfterReplace.set(this.commentIdValue, chip ? chip.dataset.kind : "add")
+  }
+
+  // A keyboard user who just toggled a chip keeps focus on it (or on the
+  // add button if the chip went away) when the server's copy replaces it.
+  restoreFocus() {
+    const kind = focusAfterReplace.get(this.commentIdValue)
+    if (!kind || !this.element.isConnected) return
+    focusAfterReplace.delete(this.commentIdValue)
+    const chip = this.chipFor(kind)
+    const target = chip && !chip.hidden ? chip : this.addTarget
+    if (!target.hidden) target.focus({ preventScroll: true })
   }
 
   // Redraws every copy of this comment's reactions, including cloned

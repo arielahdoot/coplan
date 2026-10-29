@@ -101,6 +101,22 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page.evaluate_script("window.reactionsPageMarker")).to be(true)
   end
 
+  it "keeps keyboard focus on a chip after the server's copy replaces it" do
+    create(:comment_reaction, comment: comment, user: sam, kind: "tada")
+    popover = open_thread
+
+    chip(popover, "🎉").send_keys(:enter)
+    expect(popover).to have_reaction("tada", count: 2, pressed: true)
+    wait_for { comment.reactions.where(user: viewer, kind: "tada").exists? }
+    expect(page).to have_css(".comment-reaction[data-kind='tada']:focus")
+    expect(page).to have_css(".comment-reactions__tooltip:popover-open[data-text='You, Sam Chen reacted with 🎉']", visible: :all)
+
+    chip(popover, "🎉").send_keys(:enter)
+    expect(popover).to have_reaction("tada", count: 1, pressed: false)
+    wait_for { !comment.reactions.where(user: viewer).exists? }
+    expect(page).to have_css(".comment-reaction[data-kind='tada']:focus")
+  end
+
   it "falls back to the saved reactions when the server rejects a change" do
     create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
     popover = open_thread
