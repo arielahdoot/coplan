@@ -63,6 +63,10 @@ function keepCurrentReactions(stream) {
   if (!content) return true
   const current = document.getElementById(stream.getAttribute("target") || "")
   if (current?.matches(".comment-reactions")) return replaces(current, content.firstElementChild)
+  content.querySelectorAll(".comment-reactions[id]").forEach(incoming => {
+    const onScreen = document.getElementById(incoming.id)
+    if (onScreen) rememberFocus(onScreen)
+  })
   keepNewerReactions(content)
   return true
 }

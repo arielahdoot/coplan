@@ -349,6 +349,22 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css(".comment-reaction[data-kind='rocket'][aria-pressed='true']:focus")
   end
 
+  it "keeps keyboard focus and the picker when the whole comment is replaced" do
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    popover = open_thread
+    chip(popover, "👀").send_keys(:tab)
+    expect(page).to have_css(".comment-reactions__add:focus")
+    page.driver.browser.action.send_keys(:enter).perform
+    expect(page).to have_css(".comment-reactions__picker:popover-open .comment-reactions__option:focus")
+
+    comment.update!(body_markdown: "How long do results stay warm, roughly?")
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment),
+      partial: "coplan/comments/comment", locals: { comment: comment })
+
+    expect(popover).to have_content("roughly?")
+    expect(page).to have_css(".comment-reactions__picker:popover-open .comment-reactions__option:focus")
+  end
+
   it "ignores a replacement older than the chips on screen" do
     popover = open_thread
     target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
