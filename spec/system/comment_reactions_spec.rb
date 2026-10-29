@@ -117,6 +117,20 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css(".comment-reaction[data-kind='tada']:focus")
   end
 
+  it "moves keyboard focus to the add button when removing the last reaction on a chip" do
+    create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
+    popover = open_thread
+
+    chip(popover, "❤️").send_keys(:enter)
+    expect(popover).to have_no_css(".comment-reaction", text: "❤️")
+    expect(page).to have_css(".comment-reactions__add:focus")
+    wait_for { !comment.reactions.where(user: viewer).exists? }
+    expect(page).to have_css(".comment-reactions__add:focus")
+
+    page.driver.browser.action.send_keys(:enter).perform
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+  end
+
   it "falls back to the saved reactions when the server rejects a change" do
     create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
     popover = open_thread

@@ -140,7 +140,9 @@ export default class extends Controller {
       if (!chip && !reactors.length) return
       chip ||= this.buildChip(kind)
       // Hidden rather than removed, so the confirmed reactors survive if
-      // the request that emptied this chip fails.
+      // the request that emptied this chip fails. Focus moves first, or the
+      // browser would drop it with the chip.
+      if (!reactors.length && chip.contains(document.activeElement)) this.addTarget.focus({ preventScroll: true })
       chip.hidden = !reactors.length
       if (chip.hidden && chip === this.tooltipChip) this.hideTooltip()
       chip.dataset.reactors = JSON.stringify(reactors)
