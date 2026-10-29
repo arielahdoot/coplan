@@ -135,17 +135,19 @@ RSpec.describe "Comment reactions", type: :system do
     popover = open_thread
 
     reaction = create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    comment.bump_reactions_version!
     CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
       partial: "coplan/comments/reactions", locals: { comment: reaction.comment.reload })
 
     expect(popover).to have_reaction("eyes", count: 1, pressed: false)
   end
 
-  it "ignores a replacement rendered before the chips on screen" do
+  it "ignores a replacement older than the chips on screen" do
     popover = open_thread
     target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
     stale = CoPlan::ApplicationController.render(partial: "coplan/comments/reactions", locals: { comment: comment })
     create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    comment.bump_reactions_version!
     CoPlan::Broadcaster.replace_to(plan, target: target, partial: "coplan/comments/reactions", locals: { comment: comment.reload })
     expect(popover).to have_reaction("eyes", count: 1, pressed: false)
 

@@ -91,14 +91,13 @@ export default class extends Controller {
     })
   }
 
-  // The reacting tab gets both its HTTP response and the broadcasts, which
-  // can arrive in either order. Skip a replacement rendered before the
-  // chips already on screen.
+  // Responses and broadcasts from concurrent changes can arrive in any
+  // order. Skip a replacement older than the chips already on screen.
   beforeStream(event) {
     const stream = event.target
     if (!this.element.id || stream.getAttribute("target") !== this.element.id) return
     const incoming = stream.templateContent?.firstElementChild
-    if (Number(incoming?.dataset.renderedAt) < Number(this.element.dataset.renderedAt)) {
+    if (Number(incoming?.dataset.version) < Number(this.element.dataset.version)) {
       event.preventDefault()
       return
     }

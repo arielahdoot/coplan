@@ -49,6 +49,15 @@ module CoPlan
       update!(deleted_at: Time.current)
     end
 
+    # Call after changing this comment's reactions. Pages keep whichever
+    # render of the reactions has the highest version, so an older render
+    # that arrives late can't undo a newer one. A render always reads the
+    # comment before its reactions, which keeps the version from claiming
+    # more than the reactions it shows.
+    def bump_reactions_version!
+      self.class.where(id: id).update_all("reactions_version = reactions_version + 1")
+    end
+
     # Resolves the comment author to a CoPlan::User instance, or nil for
     # author types that don't map to a user (cloud_persona, system).
     # For both human and local_agent comments, author_id is the user's id

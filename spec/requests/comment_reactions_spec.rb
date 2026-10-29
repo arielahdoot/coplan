@@ -26,6 +26,11 @@ RSpec.describe "Comment reactions", type: :request do
     expect(response.body).to include("Bob Baker reacted with thumbs up")
   end
 
+  it "bumps the comment's reactions version and renders it" do
+    expect { react }.to change { comment.reload.reactions_version }.by(1)
+    expect(response.body).to include(%(data-version="#{comment.reactions_version}"))
+  end
+
   it "is idempotent when the reaction already exists" do
     create(:comment_reaction, comment: comment, user: bob, kind: "heart")
 

@@ -32,7 +32,8 @@ module CoPlan
         @comment.reactions.where(user: current_user, kind: kind).delete_all
       end
 
-      @comment.reactions.reset
+      @comment.bump_reactions_version!
+      @comment.reload
       CommentReaction.preload_for(@comment)
       target = ActionView::RecordIdentifier.dom_id(@comment, :reactions)
       locals = { comment: @comment }
