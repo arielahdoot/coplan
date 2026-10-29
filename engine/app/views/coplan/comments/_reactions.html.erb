@@ -13,7 +13,7 @@
     <button type="button" class="comment-reaction" aria-pressed="false"
             aria-label="<%= users.map(&:name).join(", ") %> reacted with <%= CoPlan::CommentReaction.label_for(entry[:kind]) %>"
             data-kind="<%= entry[:kind] %>"
-            data-reactors="<%= users.map { |user| { id: user.id, name: user.name } }.to_json %>"
+            data-confirmed-reactors="<%= users.map { |user| { id: user.id, name: user.name } }.to_json %>"
             data-coplan--comment-reactions-target="chip"
             data-action="coplan--comment-reactions#toggle mouseenter->coplan--comment-reactions#showTooltip mouseleave->coplan--comment-reactions#hideTooltip focus->coplan--comment-reactions#showTooltip blur->coplan--comment-reactions#hideTooltip">
       <span class="comment-reaction__emoji" aria-hidden="true"><%= entry[:emoji] %></span>
@@ -38,7 +38,7 @@
   </div>
   <div popover="manual" class="comment-reactions__tooltip" aria-hidden="true" data-coplan--comment-reactions-target="tooltip"></div>
   <template data-coplan--comment-reactions-target="chipTemplate">
-    <button type="button" class="comment-reaction" aria-pressed="false" data-reactors="[]"
+    <button type="button" class="comment-reaction" aria-pressed="false" data-confirmed-reactors="[]"
             data-coplan--comment-reactions-target="chip"
             data-action="coplan--comment-reactions#toggle mouseenter->coplan--comment-reactions#showTooltip mouseleave->coplan--comment-reactions#hideTooltip focus->coplan--comment-reactions#showTooltip blur->coplan--comment-reactions#hideTooltip">
       <span class="comment-reaction__emoji" aria-hidden="true"></span>

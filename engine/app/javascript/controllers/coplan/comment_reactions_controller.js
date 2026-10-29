@@ -3,22 +3,34 @@ import { Controller } from "@hotwired/stimulus"
 // Reaction chips under a comment. The server renders one copy for every
 // viewer (broadcasts have no current_user), listing who reacted; this
 // controller marks the viewer's own reactions as pressed and names them
-// "You". Clicks update the chips immediately, then the server's Turbo
-// Stream replaces them with the saved state.
+// "You".
 //
-// Requests for one comment run in order, and only the latest response is
-// rendered, so quick repeated clicks settle on the last choice instead of
-// flickering through the intermediate ones.
+// Each chip carries the server's confirmed reactors. Choices still on
+// their way to the server are kept here, per comment, and drawn on top of
+// whatever the server last sent, so a broadcast or response that lands
+// mid-flight never undoes a newer click, and a failed request falls back
+// to the confirmed state. Requests for one comment run in order.
 const queues = new Map()
+const pending = new Map()
+let sequence = 0
 const NAME_LIMIT = 10
 
 function enqueue(key, task) {
   const run = (queues.get(key) || Promise.resolve()).catch(() => {}).then(task)
   queues.set(key, run)
-  const isLast = () => queues.get(key) === run
+  run.catch(() => {}).finally(() => { if (queues.get(key) === run) queues.delete(key) })
   return run
-    .then(result => ({ result, last: isLast() }), error => { error.last = isLast(); throw error })
-    .finally(() => { if (isLast()) queues.delete(key) })
+}
+
+function choicesFor(commentId) {
+  if (!pending.has(commentId)) pending.set(commentId, new Map())
+  return pending.get(commentId)
+}
+
+function settle(commentId, kind, seq) {
+  const choices = pending.get(commentId)
+  if (choices?.get(kind)?.seq === seq) choices.delete(kind)
+  if (choices?.size === 0) pending.delete(commentId)
 }
 
 export default class extends Controller {
@@ -28,7 +40,7 @@ export default class extends Controller {
   connect() {
     this.me = document.querySelector("meta[name='coplan-current-user-id']")?.content || ""
     this.addTarget.hidden = !this.me
-    this.refresh()
+    this.display()
   }
 
   disconnect() {
@@ -51,10 +63,12 @@ export default class extends Controller {
 
   react(kind, reacted) {
     if (!this.me) return
-    this.setReaction(kind, reacted)
-
     const commentId = this.commentIdValue
     const url = this.urlValue
+    const seq = ++sequence
+    choicesFor(commentId).set(kind, { reacted, seq })
+    this.displayAll(commentId)
+
     const body = new FormData()
     body.append("kind", kind)
     body.append("reacted", reacted)
@@ -65,34 +79,46 @@ export default class extends Controller {
       })
       if (!response.ok) throw new Error(response.status === 422 ? await response.text() : "")
       return response.text()
-    }).then(({ result, last }) => {
-      if (last) window.Turbo.renderStreamMessage(result)
+    }).then(html => {
+      settle(commentId, kind, seq)
+      window.Turbo.renderStreamMessage(html)
     }).catch(error => {
-      if (error.last) this.revert(commentId, kind, !reacted)
+      settle(commentId, kind, seq)
+      this.displayAll(commentId)
       this.toast(error.message || "Couldn't save your reaction. Please try again.")
     })
   }
 
-  // Applies a reaction change to these chips without waiting for the server.
-  setReaction(kind, reacted) {
-    let chip = this.chipFor(kind)
-    const reactors = chip ? this.reactors(chip).filter(reactor => reactor.id !== this.me) : []
-    if (reacted) reactors.push({ id: this.me, name: "" })
-    if (!reactors.length) {
-      if (chip === this.tooltipChip) this.hideTooltip()
-      chip?.remove()
-    } else {
-      chip ||= this.buildChip(kind)
-      chip.dataset.reactors = JSON.stringify(reactors)
-      chip.querySelector(".comment-reaction__count").textContent = reactors.length
-    }
-    this.refresh()
+  // Redraws every copy of this comment's reactions, including cloned
+  // discussions that don't receive Turbo Stream updates themselves.
+  displayAll(commentId) {
+    document.querySelectorAll(`[data-coplan--comment-reactions-comment-id-value="${CSS.escape(commentId)}"]`).forEach(element => {
+      this.application.getControllerForElementAndIdentifier(element, this.identifier)?.display()
+    })
   }
 
-  revert(commentId, kind, reacted) {
-    document.querySelectorAll(`[data-coplan--comment-reactions-comment-id-value="${CSS.escape(commentId)}"]`).forEach(element => {
-      this.application.getControllerForElementAndIdentifier(element, this.identifier)?.setReaction(kind, reacted)
+  display() {
+    const choices = pending.get(this.commentIdValue)
+    this.optionTargets.forEach(option => {
+      const kind = option.dataset.kind
+      let chip = this.chipFor(kind)
+      let reactors = chip ? this.confirmedReactors(chip) : []
+      const choice = choices?.get(kind)
+      if (choice) {
+        reactors = reactors.filter(reactor => reactor.id !== this.me)
+        if (choice.reacted) reactors.push({ id: this.me, name: "" })
+      }
+      if (!chip && !reactors.length) return
+      chip ||= this.buildChip(kind)
+      // Hidden rather than removed, so the confirmed reactors survive if
+      // the request that emptied this chip fails.
+      chip.hidden = !reactors.length
+      if (chip.hidden && chip === this.tooltipChip) this.hideTooltip()
+      chip.dataset.reactors = JSON.stringify(reactors)
+      const count = chip.querySelector(".comment-reaction__count")
+      if (count.textContent !== String(reactors.length)) count.textContent = reactors.length
     })
+    this.refresh()
   }
 
   refresh() {
@@ -200,7 +226,15 @@ export default class extends Controller {
   }
 
   reactors(chip) {
-    try { return JSON.parse(chip.dataset.reactors || "[]") } catch { return [] }
+    return this.parse(chip.dataset.reactors)
+  }
+
+  confirmedReactors(chip) {
+    return this.parse(chip.dataset.confirmedReactors)
+  }
+
+  parse(json) {
+    try { return JSON.parse(json || "[]") } catch { return [] }
   }
 
   toast(message) {

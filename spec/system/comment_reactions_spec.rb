@@ -101,6 +101,20 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page.evaluate_script("window.reactionsPageMarker")).to be(true)
   end
 
+  it "falls back to the saved reactions when the server rejects a change" do
+    create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
+    popover = open_thread
+    comment.soft_delete!
+
+    chip(popover, "❤️").click
+    popover.find(".comment-reactions__add").click
+    find(".comment-reactions__picker:popover-open .comment-reactions__option", text: "👍").click
+
+    expect(page).to have_css(".toasts__toast", text: "You can't react to a deleted comment.")
+    expect(popover).to have_reaction("heart", count: 1, pressed: true)
+    expect(popover).to have_no_css(".comment-reaction[data-kind='thumbs_up']")
+  end
+
   it "shows another person's reaction live" do
     popover = open_thread
 
