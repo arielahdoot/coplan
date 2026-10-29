@@ -92,28 +92,44 @@ export default class extends Controller {
   }
 
   // Responses and broadcasts from concurrent changes can arrive in any
-  // order. Skip a replacement older than the chips already on screen.
+  // order. Skip a replacement that isn't newer than the chips already on
+  // screen (the same version shows the same reactions), and note which
+  // control has focus so the new copy can take it back. Turbo renders a
+  // frame after this event, by which time another replacement may have
+  // landed, so both checks run at render time.
   beforeStream(event) {
+    const id = this.element.id
     const stream = event.target
-    if (!this.element.id || stream.getAttribute("target") !== this.element.id) return
-    const incoming = stream.templateContent?.firstElementChild
-    if (Number(incoming?.dataset.version) < Number(this.element.dataset.version)) {
-      event.preventDefault()
-      return
+    if (!id || stream.getAttribute("target") !== id) return
+    const commentId = this.commentIdValue
+    const incoming = Number(stream.templateContent?.firstElementChild?.dataset.version)
+    const render = event.detail.render
+    event.detail.render = async streamElement => {
+      const current = document.getElementById(id)
+      if (current && incoming <= Number(current.dataset.version)) return
+      const focused = document.activeElement
+      if (current?.contains(focused)) {
+        focusAfterReplace.set(commentId, {
+          kind: focused.closest(".comment-reaction, .comment-reactions__option")?.dataset.kind,
+          inPicker: Boolean(focused.closest(".comment-reactions__picker"))
+        })
+      }
+      await render(streamElement)
     }
-    const focused = document.activeElement
-    if (!this.element.contains(focused)) return
-    const chip = focused.closest(".comment-reaction")
-    focusAfterReplace.set(this.commentIdValue, chip ? chip.dataset.kind : "add")
   }
 
-  // A keyboard user who just toggled a chip keeps focus on it (or on the
-  // add button if the chip went away) when the server's copy replaces it.
+  // A keyboard user keeps focus on the same chip (or on the add button if
+  // the chip went away), or keeps the picker open, when the server's copy
+  // replaces these controls.
   restoreFocus() {
-    const kind = focusAfterReplace.get(this.commentIdValue)
-    if (!kind || !this.element.isConnected) return
+    const saved = focusAfterReplace.get(this.commentIdValue)
+    if (!saved || !this.element.isConnected) return
     focusAfterReplace.delete(this.commentIdValue)
-    const chip = this.chipFor(kind)
+    if (saved.inPicker && this.showPicker()) {
+      this.optionFor(saved.kind)?.focus({ preventScroll: true })
+      return
+    }
+    const chip = saved.kind && this.chipFor(saved.kind)
     const target = chip && !chip.hidden ? chip : this.addTarget
     if (!target.hidden) target.focus({ preventScroll: true })
   }
@@ -194,10 +210,14 @@ export default class extends Controller {
       this.closePicker()
       return
     }
+    if (this.showPicker()) this.optionTargets[0]?.focus({ preventScroll: true })
+  }
+
+  showPicker() {
     this.hideTooltip()
-    try { this.pickerTarget.showPopover() } catch { return }
+    try { this.pickerTarget.showPopover() } catch { return false }
     this.place(this.pickerTarget, this.addTarget, { above: false })
-    this.optionTargets[0]?.focus({ preventScroll: true })
+    return true
   }
 
   closePicker() {
