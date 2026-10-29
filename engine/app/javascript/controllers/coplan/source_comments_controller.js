@@ -278,6 +278,19 @@ export default class extends Controller {
       thread.dataset.anchorKind && thread.dataset.outOfDate === "true")
   }
 
+  // Reaction controls are rebuilt with their discussion; find the same
+  // chip (or the add button if the chip is gone) in the new copy.
+  sameReactionControl(element) {
+    const reactions = element?.closest(".comment-reactions")
+    if (!reactions) return null
+    const commentId = reactions.getAttribute("data-coplan--comment-reactions-comment-id-value")
+    const copy = this.discussionsTarget.querySelector(`.comment-reactions[data-coplan--comment-reactions-comment-id-value="${CSS.escape(commentId)}"]`)
+    if (!copy) return null
+    const kind = element.closest(".comment-reaction")?.dataset.kind
+    return (kind && copy.querySelector(`.comment-reaction[data-kind="${CSS.escape(kind)}"]:not([hidden])`)) ||
+      copy.querySelector(".comment-reactions__add:not([hidden])")
+  }
+
   renderDiscussions() {
     if (!this.selection && !this.showingOutdated) return
     // Keep the actual reply forms alive through broadcasts, including a
@@ -344,7 +357,8 @@ export default class extends Controller {
       this.threadToolsTarget.append(tools)
       discussions[0].querySelector(".comment-window__bar").remove()
     }
-    if (focused?.isConnected && this.panelTarget.matches(":popover-open")) focused.focus({ preventScroll: true })
+    const refocus = focused?.isConnected ? focused : this.sameReactionControl(focused)
+    if (refocus && this.panelTarget.matches(":popover-open")) refocus.focus({ preventScroll: true })
     this.composerTarget.hidden = this.showingOutdated || threads.length > 0
     this.panelTarget.classList.toggle("comment-form", !this.composerTarget.hidden)
     this.panelTarget.classList.toggle("thread-popover", this.composerTarget.hidden)

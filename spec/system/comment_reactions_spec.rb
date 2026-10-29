@@ -215,5 +215,20 @@ RSpec.describe "Comment reactions", type: :system do
     expect(panel).to have_reaction("thumbs_up", count: 1, pressed: true)
     expect(panel).to have_css(".comment-reactions", count: 1)
     wait_for { table_thread.comments.first.reactions.where(user: viewer, kind: "thumbs_up").exists? }
+
+    panel.find(".comment-reaction[data-kind='thumbs_up']").send_keys(:enter)
+    expect(panel).to have_no_css(".comment-reaction[data-kind='thumbs_up']")
+    wait_for { !table_thread.comments.first.reactions.where(user: viewer).exists? }
+    expect(page).to have_css(".source-comments .comment-reactions__add:focus")
+
+    create(:comment_reaction, comment: table_thread.comments.first, user: sam, kind: "tada")
+    table_thread.comments.first.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(table_thread.comments.first, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: table_thread.comments.first.reload })
+    expect(panel).to have_reaction("tada", count: 1, pressed: false)
+    panel.find(".comment-reaction[data-kind='tada']").send_keys(:enter)
+    expect(panel).to have_reaction("tada", count: 2, pressed: true)
+    wait_for { table_thread.comments.first.reactions.where(user: viewer, kind: "tada").exists? }
+    expect(page).to have_css(".source-comments .comment-reaction[data-kind='tada']:focus")
   end
 end
