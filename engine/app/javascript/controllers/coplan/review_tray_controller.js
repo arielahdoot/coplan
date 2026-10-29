@@ -117,7 +117,6 @@ export default class extends Controller {
   }
 
   escape(event) {
-    // Escape closes an open reaction picker first.
     if (document.querySelector(".comment-reactions__picker:popover-open")) return
     if (this.reviewsTarget.open || this.approvalTarget.open || this.comparisonTarget.open || this.activityTarget.open) return
     if (this.hasDiscussionTarget && !this.discussionTarget.hidden) {
