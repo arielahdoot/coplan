@@ -211,7 +211,7 @@ export default class extends Controller {
 
   showTooltip(event) {
     const chip = event.currentTarget
-    if (!chip.isConnected) return
+    if (!chip.isConnected || chip.hidden) return
     this.tooltipChip = chip
     const tooltip = this.tooltipTarget
     // The text lives in an attribute (rendered with CSS) so hovering never

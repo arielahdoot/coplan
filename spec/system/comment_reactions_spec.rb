@@ -139,6 +139,26 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css(".comment-reactions__picker:popover-open")
   end
 
+  it "doesn't show who reacted for a chip that the click removed" do
+    create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
+    popover = open_thread
+
+    heart = chip(popover, "❤️")
+    heart.hover
+    expect(page).to have_css(".comment-reactions__tooltip:popover-open", visible: :all)
+    # Read the tooltip in the same task as the click, before the browser
+    # notices the pointer has left the hidden chip.
+    shown = page.evaluate_script(<<~JS, heart)
+      (() => {
+        arguments[0].click()
+        return arguments[0].closest(".comment-reactions").querySelector(".comment-reactions__tooltip").matches(":popover-open")
+      })()
+    JS
+
+    expect(shown).to be(false)
+    expect(popover).to have_no_css(".comment-reaction", text: "❤️")
+  end
+
   it "falls back to the saved reactions when the server rejects a change" do
     create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
     popover = open_thread
