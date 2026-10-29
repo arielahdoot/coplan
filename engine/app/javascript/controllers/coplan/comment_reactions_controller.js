@@ -157,9 +157,7 @@ export default class extends Controller {
       // Only this endpoint's own refusals are plain text meant for people.
       const reason = response.status === 422 && type.startsWith("text/plain") ? await response.text() : ""
       throw Object.assign(new Error(reason), { reason })
-    }).then(html => {
-      applyResponse(html, () => settle(commentId, kind, seq))
-    }).catch(error => {
+    }).then(html => applyResponse(html, () => settle(commentId, kind, seq)), error => {
       settle(commentId, kind, seq)
       redraw(commentId)
       this.toast(error.reason || "Couldn't save your reaction. Please try again.")
