@@ -59,6 +59,25 @@ RSpec.describe "Comment reactions", type: :request do
     expect(user_queries.call).to eq(baseline)
   end
 
+  it "renders reactor names on other thread updates without a query per reactor" do
+    sign_in_as(alice)
+    resolve_queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 if payload[:sql].match?(/FROM\s+[`"]?coplan_users\b/) }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") do
+        patch resolve_plan_comment_thread_path(plan, thread_record), headers: turbo
+        patch reopen_plan_comment_thread_path(plan, thread_record), headers: turbo
+      end
+      count
+    end
+    create(:comment_reaction, comment: comment, user: bob, kind: "eyes")
+    resolve_queries.call
+    baseline = resolve_queries.call
+    3.times { create(:comment_reaction, comment: comment, user: create(:coplan_user), kind: "eyes") }
+
+    expect(resolve_queries.call).to eq(baseline)
+  end
+
   it "removes only the signed-in person's reaction" do
     create(:comment_reaction, comment: comment, user: bob, kind: "rocket")
     create(:comment_reaction, comment: comment, user: alice, kind: "rocket")

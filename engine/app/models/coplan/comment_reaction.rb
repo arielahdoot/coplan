@@ -37,6 +37,12 @@ module CoPlan
       end
     end
 
+    # Loads reactions and their people for the given comments in a fixed
+    # number of queries. Comments that already have them loaded are skipped.
+    def self.preload_for(comments)
+      ActiveRecord::Associations::Preloader.new(records: Array(comments), associations: { reactions: :user }).call
+    end
+
     # The read-only shape agents see on each comment in thread JSON.
     def self.as_api_json(comment)
       return [] if comment.deleted?

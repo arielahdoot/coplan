@@ -2,6 +2,7 @@
     current_user. The coplan--comment-reactions controller reads the
     reactor ids to mark the viewer's own reactions and to say "You". %>
 <% thread = comment.comment_thread %>
+<% CoPlan::CommentReaction.preload_for(comment) %>
 <div class="comment-reactions"
      id="<%= dom_id(comment, :reactions) %>"
      data-controller="coplan--comment-reactions"
