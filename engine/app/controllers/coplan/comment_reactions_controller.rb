@@ -9,7 +9,7 @@ module CoPlan
       authorize!(@plan, :show?)
 
       kind = params[:kind].to_s
-      reacted = ActiveModel::Type::Boolean.new.cast(params[:reacted].presence)
+      reacted = { "true" => true, "false" => false }[params[:reacted].to_s]
       unless CommentReaction::KINDS.key?(kind) && !reacted.nil?
         render plain: "Unknown reaction.", status: :unprocessable_content
         return

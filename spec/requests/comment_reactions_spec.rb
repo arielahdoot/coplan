@@ -88,9 +88,11 @@ RSpec.describe "Comment reactions", type: :request do
     expect(response).to have_http_status(:unprocessable_content)
   end
 
-  it "requires the desired state" do
-    expect { react(reacted: "") }.not_to change(CoPlan::CommentReaction, :count)
-    expect(response).to have_http_status(:unprocessable_content)
+  [ "", "remove", "0x" ].each do |value|
+    it "rejects #{value.inspect} as the desired state" do
+      expect { react(reacted: value) }.not_to change(CoPlan::CommentReaction, :count)
+      expect(response).to have_http_status(:unprocessable_content)
+    end
   end
 
   it "rejects reactions on a deleted comment" do
