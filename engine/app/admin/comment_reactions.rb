@@ -4,6 +4,8 @@ ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
   actions :index, :show
   config.batch_actions = false
 
+  kind_label = proc { |reaction| "#{CoPlan::CommentReaction.emoji_for(reaction.kind)} #{reaction.kind}" }
+
   filter :comment_id
   filter :user
   filter :kind, as: :select, collection: CoPlan::CommentReaction::KINDS.keys
@@ -13,7 +15,7 @@ ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
     id_column
     column :comment
     column :user
-    column(:kind) { |reaction| "#{CoPlan::CommentReaction.emoji_for(reaction.kind)} #{reaction.kind}" }
+    column(:kind, &kind_label)
     column :created_at
     actions
   end
@@ -23,7 +25,7 @@ ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
       row :id
       row :comment
       row :user
-      row(:kind) { |reaction| "#{CoPlan::CommentReaction.emoji_for(reaction.kind)} #{reaction.kind}" }
+      row(:kind, &kind_label)
       row :created_at
       row :updated_at
     end
