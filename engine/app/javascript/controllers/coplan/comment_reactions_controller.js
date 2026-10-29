@@ -83,6 +83,9 @@ export default class extends Controller {
       return response.text()
     }).then(html => {
       settle(commentId, kind, seq)
+      // The response may be skipped as no newer than the chips on screen,
+      // so redraw them without this choice now.
+      this.displayAll(commentId)
       window.Turbo.renderStreamMessage(html)
     }).catch(error => {
       settle(commentId, kind, seq)

@@ -171,6 +171,29 @@ RSpec.describe "Comment reactions", type: :system do
     expect(page).to have_css(".thread-popover:popover-open")
   end
 
+  it "drops an in-flight choice once answered, even by a snapshot already on screen" do
+    popover = open_thread
+    target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
+    page.execute_script(<<~JS)
+      window.fetch = () => new Promise(resolve => { window.answerReaction = body => resolve(new Response(body)) })
+    JS
+
+    popover.find(".comment-reactions__add").click
+    find(".comment-reactions__picker:popover-open .comment-reactions__option", text: "🚀").click
+    expect(popover).to have_reaction("rocket", count: 1, pressed: true)
+
+    comment.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: target, partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    expect(popover).to have_css(%(.comment-reactions[data-version="#{comment.reactions_version}"]))
+    expect(popover).to have_reaction("rocket", count: 1, pressed: true)
+
+    snapshot = CoPlan::ApplicationController.render(partial: "coplan/comments/reactions", locals: { comment: comment })
+    page.execute_script(<<~JS, target, snapshot)
+      window.answerReaction(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
+    JS
+    expect(popover).to have_no_css(".comment-reaction", text: "🚀")
+  end
+
   it "ignores a replacement older than the chips on screen" do
     popover = open_thread
     target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
