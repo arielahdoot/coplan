@@ -50,6 +50,12 @@ RSpec.describe "Comment reactions", type: :system do
     have_css(".comment-reaction[data-kind='#{kind}'][aria-pressed='#{pressed}'] .comment-reaction__count", exact_text: count.to_s)
   end
 
+  # A click can be lost while the server's copy replaces the chips (the
+  # press and release land on different elements), so wait for that copy.
+  def have_saved_reactions
+    have_css(".comment-reactions[data-version='#{comment.reload.reactions_version}']")
+  end
+
   def chip(scope, emoji)
     scope.find(".comment-reaction", text: emoji)
   end
@@ -86,10 +92,12 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_reaction("rocket", count: 1, pressed: true)
     expect(page).to have_no_css(".comment-reactions__picker:popover-open")
     wait_for { comment.reactions.where(user: viewer, kind: "rocket").exists? }
+    expect(popover).to have_saved_reactions
 
     chip(popover, "🎉").click
     expect(popover).to have_reaction("tada", count: 2, pressed: true)
     wait_for { comment.reactions.where(kind: "tada").count == 2 }
+    expect(popover).to have_saved_reactions
 
     chip(popover, "🎉").click
     expect(popover).to have_reaction("tada", count: 1, pressed: false)
