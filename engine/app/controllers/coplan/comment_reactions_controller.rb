@@ -14,10 +14,6 @@ module CoPlan
         render plain: "Unknown reaction.", status: :unprocessable_content
         return
       end
-      if @comment.deleted?
-        render plain: "You can't react to a deleted comment.", status: :unprocessable_content
-        return
-      end
 
       # Saving inside each format means a request for any other format is
       # refused before anything changes.
@@ -32,6 +28,8 @@ module CoPlan
           redirect_to helpers.plan_browse_path(@plan)
         end
       end
+    rescue Comment::DeletedError
+      render plain: "You can't react to a deleted comment.", status: :unprocessable_content
     end
 
     private

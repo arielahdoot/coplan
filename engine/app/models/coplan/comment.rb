@@ -2,6 +2,8 @@ module CoPlan
   class Comment < ApplicationRecord
     AUTHOR_TYPES = %w[human local_agent cloud_persona system].freeze
 
+    class DeletedError < StandardError; end
+
     # Attribution labels sit inline next to the body, so they stay short.
     AGENT_NAME_LIMIT = 20
 
@@ -61,6 +63,9 @@ module CoPlan
     def set_reaction!(user:, kind:, reacted:)
       transaction do
         bump_reactions_version!
+        # Checked under the lock, so a comment deleted a moment ago can't
+        # gain a reaction from a request that loaded it before.
+        raise DeletedError if self.class.where(id: id).where.not(deleted_at: nil).exists?
         if reacted
           reactions.find_or_create_by!(user: user, kind: kind)
         else
