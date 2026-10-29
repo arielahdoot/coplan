@@ -57,6 +57,18 @@ RSpec.describe CoPlan::CommentReaction, type: :model do
     expect(described_class.exists?(reaction.id)).to be(false)
   end
 
+  it "locks its comment before being removed with it, as reacting does" do
+    reaction = create(:comment_reaction)
+    statements = []
+    collect = ->(*, payload) { statements << payload[:sql] }
+    ActiveSupport::Notifications.subscribed(collect, "sql.active_record") { reaction.comment.destroy! }
+
+    lock = statements.index { |sql| sql.match?(/coplan_comments\b.*FOR UPDATE/i) }
+    delete = statements.index { |sql| sql.match?(/DELETE FROM [`"]?coplan_comment_reactions\b/i) }
+    expect(lock).to be_present
+    expect(lock).to be < delete
+  end
+
   it "is removed with its user" do
     reaction = create(:comment_reaction)
     reaction.user.destroy!

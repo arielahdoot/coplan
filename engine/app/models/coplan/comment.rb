@@ -27,6 +27,10 @@ module CoPlan
     validates :agent_name, presence: { message: "is required for agent comments" }, if: -> { author_type == "local_agent" }
     validates :agent_name, length: { maximum: AGENT_NAME_LIMIT }, allow_nil: true
 
+    # Lock the comment before its reactions are deleted, in the same order
+    # set_reaction! takes them, so destroying it while someone reacts can't
+    # deadlock.
+    before_destroy :lock_for_reactions, prepend: true
     before_create :assign_agent_harness, if: :agent?
     before_save :rewrite_plain_mentions, if: :body_markdown_changed?
     after_create_commit :notify_thread_participants
@@ -86,6 +90,10 @@ module CoPlan
     end
 
     private
+
+    def lock_for_reactions
+      self.class.lock.where(id: id).pick(:id)
+    end
 
     def assign_agent_harness
       identity = api_token&.metadata.to_h["harness"].presence || agent_name.presence || "agent"
