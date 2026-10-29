@@ -159,6 +159,25 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_no_css(".comment-reaction", text: "❤️")
   end
 
+  it "doesn't show who reacted when a clicked chip gets its focus back after the pointer moved on" do
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    popover = open_thread
+    chip(popover, "👀").click
+    expect(popover).to have_reaction("eyes", count: 2, pressed: true)
+    expect(page).to have_saved_reactions
+    popover.find(".comment__body", match: :first).hover
+    expect(page).to have_no_css(".comment-reactions__tooltip:popover-open", visible: :all)
+
+    create(:comment_reaction, comment: comment, user: sam, kind: "rocket")
+    comment.bump_reactions_version!
+    CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
+      partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+
+    expect(popover).to have_reaction("rocket", count: 1, pressed: false)
+    expect(page).to have_css(".comment-reaction[data-kind='eyes']:focus")
+    expect(page).to have_no_css(".comment-reactions__tooltip:popover-open", visible: :all)
+  end
+
   it "falls back to the saved reactions when the server rejects a change" do
     create(:comment_reaction, comment: comment, user: viewer, kind: "heart")
     popover = open_thread

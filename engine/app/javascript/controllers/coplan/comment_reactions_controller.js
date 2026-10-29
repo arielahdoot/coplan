@@ -229,6 +229,9 @@ export default class extends Controller {
   showTooltip(event) {
     const chip = event.currentTarget
     if (!chip.isConnected || chip.hidden) return
+    // Focus given back after a mouse click isn't visible focus, and the
+    // pointer may have moved on, so only hovering shows the names then.
+    if (event.type === "focus" && !chip.matches(":focus-visible")) return
     this.tooltipChip = chip
     const tooltip = this.tooltipTarget
     // The text lives in an attribute (rendered with CSS) so hovering never
