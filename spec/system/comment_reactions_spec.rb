@@ -187,6 +187,19 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_reaction("eyes", count: 1, pressed: false)
   end
 
+  it "opens the picker from the keyboard after a press that didn't end in a click" do
+    popover = open_thread
+    add = popover.find(".comment-reactions__add")
+    add.click
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+
+    page.driver.browser.action.move_to(add.native).click_and_hold.move_by(0, -60).release.perform
+    expect(page).to have_no_css(".comment-reactions__picker:popover-open")
+
+    add.send_keys(:enter)
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+  end
+
   it "closes the picker when the comment window scrolls" do
     popover = open_thread
     popover.find(".comment-reactions__add").click

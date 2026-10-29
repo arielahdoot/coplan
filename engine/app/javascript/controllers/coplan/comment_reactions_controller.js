@@ -206,13 +206,15 @@ export default class extends Controller {
   }
 
   // Light dismiss runs before the click, so remember whether this press
-  // started with the picker open; otherwise the click would reopen it.
+  // started with the picker open; otherwise the click would reopen it. A
+  // press can end without a click, so only a pointer click (detail > 0)
+  // reads what was remembered.
   notePicker() {
     this.pickerWasOpen = this.pickerTarget.matches(":popover-open")
   }
 
-  openPicker() {
-    const wasOpen = this.pickerWasOpen || this.pickerTarget.matches(":popover-open")
+  openPicker(event) {
+    const wasOpen = (event?.detail > 0 && this.pickerWasOpen) || this.pickerTarget.matches(":popover-open")
     this.pickerWasOpen = false
     if (wasOpen) {
       this.closePicker()
