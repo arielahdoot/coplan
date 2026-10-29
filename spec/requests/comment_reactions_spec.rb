@@ -38,21 +38,6 @@ RSpec.describe "Comment reactions", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
-  it "treats a concurrent add of the same reaction as success" do
-    create(:comment_reaction, comment: comment, user: bob, kind: "thumbs_up")
-    # Another request inserts the row after this request's lookup misses it.
-    missed = false
-    allow_any_instance_of(ActiveRecord::Relation).to receive(:exists?).and_wrap_original do |original, *args, **kwargs|
-      next original.call(*args, **kwargs) if missed || original.receiver.klass != CoPlan::CommentReaction
-
-      missed = true
-      false
-    end
-
-    expect { react }.not_to change(CoPlan::CommentReaction, :count)
-    expect(response).to have_http_status(:ok)
-  end
-
   it "loads reactor names without a query per reactor" do
     user_queries = lambda do
       count = 0
@@ -85,13 +70,6 @@ RSpec.describe "Comment reactions", type: :request do
     3.times { create(:comment_reaction, comment: comment, user: create(:coplan_user), kind: "eyes") }
 
     expect(resolve_queries.call).to eq(baseline)
-  end
-
-  it "saves nothing when the version can't be bumped" do
-    allow_any_instance_of(CoPlan::Comment).to receive(:bump_reactions_version!).and_raise(ActiveRecord::StatementInvalid)
-
-    expect { react }.to raise_error(ActiveRecord::StatementInvalid)
-    expect(comment.reactions).to be_empty
   end
 
   it "removes only the signed-in person's reaction" do

@@ -19,16 +19,7 @@ module CoPlan
         return
       end
 
-      # The change and its version move together, so a page never sees one
-      # without the other.
-      Comment.transaction do
-        if reacted
-          add_reaction(kind)
-        else
-          @comment.reactions.where(user: current_user, kind: kind).delete_all
-        end
-        @comment.bump_reactions_version!
-      end
+      @comment.set_reaction!(user: current_user, kind: kind, reacted: reacted)
       @comment.reload
       CommentReaction.preload_for(@comment)
       target = ActionView::RecordIdentifier.dom_id(@comment, :reactions)
@@ -43,18 +34,6 @@ module CoPlan
     end
 
     private
-
-    # A concurrent request can add the same reaction between the lookup and
-    # the insert; depending on timing that surfaces as the uniqueness
-    # validation or as the unique index. The savepoint keeps the enclosing
-    # transaction usable after the index rejects the insert.
-    def add_reaction(kind)
-      return if @comment.reactions.exists?(user: current_user, kind: kind)
-
-      CommentReaction.transaction(requires_new: true) { @comment.reactions.create!(user: current_user, kind: kind) }
-    rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
-      raise unless @comment.reactions.exists?(user: current_user, kind: kind)
-    end
 
     def set_comment
       @plan = Plan.find(params[:plan_id])

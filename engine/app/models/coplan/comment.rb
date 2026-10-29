@@ -49,11 +49,26 @@ module CoPlan
       update!(deleted_at: Time.current)
     end
 
-    # Call after changing this comment's reactions. Pages keep whichever
-    # render of the reactions has the highest version, so an older render
-    # that arrives late can't undo a newer one. A render always reads the
-    # comment before its reactions, which keeps the version from claiming
-    # more than the reactions it shows.
+    # Adds or removes one person's reaction of one kind and bumps the
+    # version in the same transaction. Bumping first locks this comment, so
+    # changes to its reactions run one at a time: simultaneous inserts
+    # can't deadlock on the comment row, and each change sees what the one
+    # before it saved.
+    def set_reaction!(user:, kind:, reacted:)
+      transaction do
+        bump_reactions_version!
+        if reacted
+          reactions.find_or_create_by!(user: user, kind: kind)
+        else
+          reactions.where(user: user, kind: kind).delete_all
+        end
+      end
+    end
+
+    # Pages keep whichever render of the reactions has the highest version,
+    # so an older render that arrives late can't undo a newer one. A render
+    # always reads the comment before its reactions, which keeps the
+    # version from claiming more than the reactions it shows.
     def bump_reactions_version!
       self.class.where(id: id).update_all("reactions_version = reactions_version + 1")
     end

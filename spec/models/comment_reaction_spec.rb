@@ -63,3 +63,75 @@ RSpec.describe CoPlan::CommentReaction, type: :model do
     expect(described_class.exists?(reaction.id)).to be(false)
   end
 end
+
+RSpec.describe CoPlan::Comment, "#set_reaction!", type: :model do
+  let(:comment) { create(:comment) }
+  let(:user) { create(:coplan_user) }
+
+  it "adds and removes a reaction, bumping the version each time" do
+    expect { comment.set_reaction!(user: user, kind: "heart", reacted: true) }
+      .to change { comment.reload.reactions_version }.by(1)
+    expect(comment.reactions.where(user: user, kind: "heart")).to exist
+
+    expect { comment.set_reaction!(user: user, kind: "heart", reacted: false) }
+      .to change { comment.reload.reactions_version }.by(1)
+    expect(comment.reactions).to be_empty
+  end
+
+  it "keeps the version when the change fails" do
+    allow(comment.reactions).to receive(:find_or_create_by!).and_raise(ActiveRecord::StatementInvalid)
+
+    expect { comment.set_reaction!(user: user, kind: "heart", reacted: true) }.to raise_error(ActiveRecord::StatementInvalid)
+    expect(comment.reload.reactions_version).to eq(0)
+  end
+end
+
+RSpec.describe "Simultaneous comment reactions", type: :model do
+  # Real concurrency needs real connections, which can't see each other's
+  # uncommitted rows.
+  self.use_transactional_tests = false
+
+  after do
+    truncate_tables("coplan_comment_reactions", "coplan_notifications", "coplan_comments", "coplan_comment_threads",
+      *TruncationHelpers::PLAN_TABLES)
+  end
+
+  def in_parallel(count, &block)
+    ready = Queue.new
+    start = Queue.new
+    threads = count.times.map do |index|
+      Thread.new do
+        ActiveRecord::Base.connection_pool.with_connection do
+          ready << true
+          start.pop
+          block.call(index)
+        end
+      end
+    end
+    Timeout.timeout(20) { count.times { ready.pop } }
+    count.times { start << true }
+    threads.each { |thread| expect(thread.join(20)).to be_present }
+    threads.map(&:value)
+  ensure
+    threads&.each { |thread| thread.kill if thread.alive? }
+  end
+
+  it "saves reactions from several people at once" do
+    comment = create(:comment)
+    users = Array.new(4) { create(:coplan_user) }
+
+    in_parallel(users.size) { |index| CoPlan::Comment.find(comment.id).set_reaction!(user: users[index], kind: "tada", reacted: true) }
+
+    expect(comment.reactions.count).to eq(4)
+    expect(comment.reload.reactions_version).to eq(4)
+  end
+
+  it "saves one reaction when the same person adds it from several tabs at once" do
+    comment = create(:comment)
+    user = create(:coplan_user)
+
+    in_parallel(3) { CoPlan::Comment.find(comment.id).set_reaction!(user: user, kind: "heart", reacted: true) }
+
+    expect(comment.reactions.where(user: user, kind: "heart").count).to eq(1)
+  end
+end
