@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 import { registerShortcuts, commandFor } from "coplan/shortcuts"
 import { commentWindowTop } from "coplan/comment_window"
+import { onlyReactionsChanged } from "coplan/comment_reactions"
 
 export default class extends Controller {
 
@@ -252,7 +253,8 @@ export default class extends Controller {
     const threadsContainer = document.getElementById("plan-threads")
     if (threadsContainer) {
       this.cancelPendingAdvance()
-      this.advanceObserver = new MutationObserver(() => {
+      this.advanceObserver = new MutationObserver(records => {
+        if (onlyReactionsChanged(records)) return
         this.cancelPendingAdvance()
         this.advanceAfterAction()
       })

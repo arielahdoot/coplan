@@ -802,6 +802,34 @@ RSpec.describe "Comment UX", type: :system do
       expect(thread1.reload.status).to eq("resolved")
     end
 
+    it "auto-advances after 'e' even when a reaction arrives before the resolve" do
+      thread1 = create_anchored_thread(plan: plan, anchor_text: "microservices architecture", body: "Feedback 1", user: reviewer)
+      create_anchored_thread(plan: plan, anchor_text: "PostgreSQL", body: "Feedback 2", user: reviewer)
+      visit plan_page_path(plan)
+      find("body").send_keys("j")
+      expect(find(".thread-popover", visible: true)).to have_content("Feedback 1")
+      page.execute_script(<<~JS)
+        const submit = HTMLFormElement.prototype.requestSubmit
+        HTMLFormElement.prototype.requestSubmit = function () {
+          HTMLFormElement.prototype.requestSubmit = submit
+          window.heldSubmit = () => submit.call(this)
+        }
+      JS
+
+      find("body").send_keys("e")
+      expect(page.evaluate_script("typeof window.heldSubmit")).to eq("function")
+      comment = thread1.comments.first
+      create(:comment_reaction, comment: comment, user: author, kind: "eyes")
+      comment.bump_reactions_version!
+      CoPlan::Broadcaster.replace_to(plan, target: ActionView::RecordIdentifier.dom_id(comment, :reactions),
+        partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+      expect(page).to have_css(".comment-reactions[data-version='#{comment.reactions_version}']", visible: :all)
+      page.execute_script("window.heldSubmit()")
+
+      expect(page).to have_css(".thread-popover:popover-open", text: "Feedback 2", wait: 5)
+      expect(thread1.reload.status).to eq("resolved")
+    end
+
     it "does not fire the e shortcut when typing in a textarea" do
       create_anchored_thread(plan: plan, anchor_text: "microservices architecture", body: "Feedback", user: reviewer)
       visit plan_page_path(plan)

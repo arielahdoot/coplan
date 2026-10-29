@@ -10,3 +10,12 @@ export function keepNewerReactions(root) {
     if (onScreen && reactionsVersion(incoming) < reactionsVersion(onScreen)) incoming.replaceWith(onScreen.cloneNode(true))
   })
 }
+
+// Whether a batch of DOM mutations touched nothing but reaction chips.
+// Chips change with every reaction anyone makes, so observers waiting for
+// a thread's own update can ignore them.
+export function onlyReactionsChanged(records) {
+  const reactions = node => node.nodeType === Node.TEXT_NODE ? !node.textContent.trim() : node.matches?.(".comment-reactions")
+  return records.every(record => record.target.closest?.(".comment-reactions") ||
+    [ ...record.addedNodes, ...record.removedNodes ].every(reactions))
+}
