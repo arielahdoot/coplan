@@ -298,6 +298,37 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_no_css(".comment-reaction", text: "🚀")
   end
 
+  it "keeps a saved click drawn when the chips are redrawn as its response arrives" do
+    popover = open_thread
+    page.execute_script(<<~JS, ActionView::RecordIdentifier.dom_id(comment, :reactions))
+      const target = arguments[0]
+      const fetch = window.fetch
+      window.fetch = async (...args) => {
+        window.fetch = fetch
+        const response = await fetch(...args)
+        const text = response.text.bind(response)
+        response.text = async () => {
+          const html = await text()
+          setTimeout(() => {
+            const reactions = document.getElementById(target)
+            window.Stimulus.getControllerForElementAndIdentifier(reactions, "coplan--comment-reactions").display()
+            const chip = reactions.querySelector(".comment-reaction[data-kind='thumbs_up']")
+            window.pressedAsResponseArrived = Boolean(chip && !chip.hidden && chip.getAttribute("aria-pressed") === "true")
+          })
+          return html
+        }
+        return response
+      }
+    JS
+
+    popover.find(".comment-reactions__add").click
+    find(".comment-reactions__picker:popover-open .comment-reactions__option", text: "👍").click
+    wait_for { !page.evaluate_script("window.pressedAsResponseArrived === undefined") }
+
+    expect(page.evaluate_script("window.pressedAsResponseArrived")).to be(true)
+    expect(popover).to have_reaction("thumbs_up", count: 1, pressed: true)
+  end
+
   it "keeps focus on a new chip while its saved copy arrives" do
     popover = open_thread
     target = ActionView::RecordIdentifier.dom_id(comment, :reactions)

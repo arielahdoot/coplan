@@ -62,18 +62,34 @@ function keepCurrentReactions(stream) {
   const content = stream.templateElement?.content
   if (!content) return true
   const current = document.getElementById(stream.getAttribute("target") || "")
-  if (current?.matches(".comment-reactions")) {
-    // The same version shows the same reactions. A response skipped here
-    // may still have settled a choice, so redraw without it.
-    if (version(content.firstElementChild) <= version(current)) {
-      redraw(current.getAttribute(COMMENT_ID))
-      return false
-    }
-    rememberFocus(current)
-    return true
-  }
+  if (current?.matches(".comment-reactions")) return replaces(current, content.firstElementChild)
   keepNewerReactions(content)
   return true
+}
+
+// Whether incoming chips should replace the current ones. The same
+// version shows the same reactions. Chips skipped here may still have
+// settled a choice, so redraw without it.
+function replaces(current, incoming) {
+  if (version(incoming) <= version(current)) {
+    redraw(current.getAttribute(COMMENT_ID))
+    return false
+  }
+  rememberFocus(current)
+  return true
+}
+
+// Applies a request's own response right away. Turbo would render it a
+// frame later, and a redraw in between, with the choice already settled,
+// would briefly show the click undone.
+function applyResponse(html, settleChoice) {
+  const template = document.createElement("template")
+  template.innerHTML = html
+  const stream = template.content.querySelector("turbo-stream")
+  const incoming = stream?.querySelector("template")?.content.firstElementChild
+  const current = document.getElementById(stream?.getAttribute("target") || "")
+  settleChoice()
+  if (current && incoming && replaces(current, incoming)) current.replaceWith(incoming)
 }
 
 // Notes which control has focus so the replacement can take it back.
@@ -142,8 +158,7 @@ export default class extends Controller {
       const reason = response.status === 422 && type.startsWith("text/plain") ? await response.text() : ""
       throw Object.assign(new Error(reason), { reason })
     }).then(html => {
-      settle(commentId, kind, seq)
-      window.Turbo.renderStreamMessage(html)
+      applyResponse(html, () => settle(commentId, kind, seq))
     }).catch(error => {
       settle(commentId, kind, seq)
       redraw(commentId)
