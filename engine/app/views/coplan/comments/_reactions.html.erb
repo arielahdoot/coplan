@@ -9,7 +9,7 @@
      data-coplan--comment-reactions-url-value="<%= plan_comment_thread_comment_reactions_path(thread.plan, thread, comment) %>"
      data-coplan--comment-reactions-comment-id-value="<%= comment.id %>"
      data-version="<%= comment.reactions_version %>"
-     data-action="turbo:before-stream-render@document->coplan--comment-reactions#beforeStream scroll@window->coplan--comment-reactions#closePicker resize@window->coplan--comment-reactions#closePicker">
+     data-action="turbo:before-stream-render@document->coplan--comment-reactions#beforeStream">
   <% CoPlan::CommentReaction.summarize(comment.reactions).each do |entry| %>
     <% users = entry[:reactions].map(&:user) %>
     <button type="button" class="comment-reaction" aria-pressed="false"

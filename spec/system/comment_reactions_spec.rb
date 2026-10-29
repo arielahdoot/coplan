@@ -187,6 +187,17 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_reaction("eyes", count: 1, pressed: false)
   end
 
+  it "closes the picker when the comment window scrolls" do
+    popover = open_thread
+    popover.find(".comment-reactions__add").click
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+
+    page.execute_script("document.querySelector('.thread-popover:popover-open .thread-popover__comments').dispatchEvent(new Event('scroll'))")
+
+    expect(page).to have_no_css(".comment-reactions__picker:popover-open")
+    expect(page).to have_css(".thread-popover:popover-open")
+  end
+
   it "keeps the picker open when someone else's reaction arrives" do
     popover = open_thread
     popover.find(".comment-reactions__add").click

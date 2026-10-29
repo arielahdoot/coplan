@@ -48,6 +48,7 @@ export default class extends Controller {
   disconnect() {
     this.hideTooltip()
     this.closePicker()
+    this.stopClosingOnMove()
   }
 
   toggle(event) {
@@ -224,6 +225,7 @@ export default class extends Controller {
     this.hideTooltip()
     try { this.pickerTarget.showPopover() } catch { return false }
     this.place(this.pickerTarget, this.addTarget, { above: false })
+    this.closeOnMove()
     return true
   }
 
@@ -235,7 +237,22 @@ export default class extends Controller {
   pickerToggled(event) {
     const open = event.newState === "open"
     this.addTarget.setAttribute("aria-expanded", open)
+    if (!open) this.stopClosingOnMove()
     if (!open && this.pickerTarget.contains(document.activeElement)) this.addTarget.focus({ preventScroll: true })
+  }
+
+  // The picker is fixed in place, so any scroll (including one inside a
+  // comment window, which doesn't bubble) or resize leaves it behind.
+  closeOnMove() {
+    this.moved ||= () => this.closePicker()
+    window.addEventListener("scroll", this.moved, { capture: true, passive: true })
+    window.addEventListener("resize", this.moved)
+  }
+
+  stopClosingOnMove() {
+    if (!this.moved) return
+    window.removeEventListener("scroll", this.moved, { capture: true })
+    window.removeEventListener("resize", this.moved)
   }
 
   buildChip(kind) {
