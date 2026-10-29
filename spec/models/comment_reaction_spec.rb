@@ -46,7 +46,8 @@ RSpec.describe CoPlan::CommentReaction, type: :model do
       summary = described_class.summarize(comment.reactions.includes(:user))
 
       expect(summary.map { |entry| entry[:kind] }).to eq(%w[thumbs_up rocket])
-      expect(summary.first).to include(emoji: "👍", count: 2, users: [ sam, alex ])
+      expect(summary.first).to include(emoji: "👍", count: 2)
+      expect(summary.first[:reactions].map(&:user)).to eq([ sam, alex ])
     end
   end
 

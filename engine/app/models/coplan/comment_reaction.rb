@@ -26,14 +26,23 @@ module CoPlan
       KINDS.fetch(kind).fetch(:label)
     end
 
-    # Groups reactions by kind in KINDS order, with reactors in the order
-    # they reacted. Works on a preloaded collection without extra queries.
+    # Groups reactions by kind in KINDS order, each group in the order
+    # people reacted. Works on a preloaded collection without extra queries.
     def self.summarize(reactions)
       grouped = reactions.sort_by { |reaction| [ reaction.created_at, reaction.id ] }.group_by(&:kind)
       KINDS.keys.filter_map do |kind|
         next unless (members = grouped[kind])
 
-        { kind: kind, emoji: emoji_for(kind), count: members.size, users: members.map(&:user) }
+        { kind: kind, emoji: emoji_for(kind), count: members.size, reactions: members }
+      end
+    end
+
+    # The read-only shape agents see on each comment in thread JSON.
+    def self.as_api_json(comment)
+      return [] if comment.deleted?
+
+      summarize(comment.reactions).map do |entry|
+        entry.slice(:kind, :emoji, :count).merge(user_ids: entry[:reactions].map(&:user_id))
       end
     end
 

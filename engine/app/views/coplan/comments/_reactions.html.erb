@@ -9,11 +9,11 @@
      data-coplan--comment-reactions-comment-id-value="<%= comment.id %>"
      data-action="scroll@window->coplan--comment-reactions#closePicker resize@window->coplan--comment-reactions#closePicker">
   <% CoPlan::CommentReaction.summarize(comment.reactions).each do |entry| %>
-    <% names = entry[:users].map(&:name) %>
+    <% users = entry[:reactions].map(&:user) %>
     <button type="button" class="comment-reaction" aria-pressed="false"
-            aria-label="<%= names.join(", ") %> reacted with <%= CoPlan::CommentReaction.label_for(entry[:kind]) %>"
+            aria-label="<%= users.map(&:name).join(", ") %> reacted with <%= CoPlan::CommentReaction.label_for(entry[:kind]) %>"
             data-kind="<%= entry[:kind] %>"
-            data-reactors="<%= entry[:users].map { |user| { id: user.id, name: user.name } }.to_json %>"
+            data-reactors="<%= users.map { |user| { id: user.id, name: user.name } }.to_json %>"
             data-coplan--comment-reactions-target="chip"
             data-action="coplan--comment-reactions#toggle mouseenter->coplan--comment-reactions#showTooltip mouseleave->coplan--comment-reactions#hideTooltip focus->coplan--comment-reactions#showTooltip blur->coplan--comment-reactions#hideTooltip">
       <span class="comment-reaction__emoji" aria-hidden="true"><%= entry[:emoji] %></span>
