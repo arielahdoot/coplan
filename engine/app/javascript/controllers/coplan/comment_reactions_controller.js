@@ -79,10 +79,12 @@ export default class extends Controller {
         method: "PATCH", body,
         headers: { "Accept": "text/vnd.turbo-stream.html", "X-CSRF-Token": document.querySelector('meta[name="csrf-token"]')?.content }
       })
-      if (!response.ok) throw new Error(response.status === 422 ? await response.text() : "")
-      // A signed-out request is redirected to the HTML sign-in page.
-      if (!response.headers.get("Content-Type")?.startsWith("text/vnd.turbo-stream.html")) throw new Error("")
-      return response.text()
+      const type = response.headers.get("Content-Type") || ""
+      // A signed-out request may be redirected to an HTML sign-in page.
+      if (response.ok && type.startsWith("text/vnd.turbo-stream.html")) return response.text()
+      // Only this endpoint's own refusals are plain text meant for people.
+      const reason = response.status === 422 && type.startsWith("text/plain") ? await response.text() : ""
+      throw Object.assign(new Error(reason), { reason })
     }).then(html => {
       settle(commentId, kind, seq)
       // The response may be skipped as no newer than the chips on screen,
@@ -92,7 +94,7 @@ export default class extends Controller {
     }).catch(error => {
       settle(commentId, kind, seq)
       this.displayAll(commentId)
-      this.toast(error.message || "Couldn't save your reaction. Please try again.")
+      this.toast(error.reason || "Couldn't save your reaction. Please try again.")
     })
   }
 

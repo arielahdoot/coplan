@@ -159,6 +159,23 @@ RSpec.describe "Comment reactions", type: :system do
     expect(comment.reactions.where(user: viewer, kind: "heart")).to exist
   end
 
+  [
+    [ "offline", "Promise.reject(new TypeError('Failed to fetch'))" ],
+    [ "refused by the framework", "Promise.resolve(new Response('<html>Invalid authenticity token</html>', " \
+      "{ status: 422, headers: { 'Content-Type': 'text/html' } }))" ]
+  ].each do |situation, response|
+    it "shows a plain message when the request fails #{situation}" do
+      popover = open_thread
+      page.execute_script("window.fetch = () => #{response}")
+
+      popover.find(".comment-reactions__add").click
+      find(".comment-reactions__picker:popover-open .comment-reactions__option", text: "👍").click
+
+      expect(page).to have_css(".toasts__toast", exact_text: "Couldn't save your reaction. Please try again.")
+      expect(popover).to have_no_css(".comment-reaction", text: "👍")
+    end
+  end
+
   it "shows another person's reaction live" do
     popover = open_thread
 
