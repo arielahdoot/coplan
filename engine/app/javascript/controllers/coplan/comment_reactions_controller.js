@@ -89,6 +89,16 @@ export default class extends Controller {
     })
   }
 
+  // The reacting tab gets both its HTTP response and the broadcasts, which
+  // can arrive in either order. Skip a replacement rendered before the
+  // chips already on screen.
+  beforeStream(event) {
+    const stream = event.target
+    if (!this.element.id || stream.getAttribute("target") !== this.element.id) return
+    const incoming = stream.templateContent?.firstElementChild
+    if (Number(incoming?.dataset.renderedAt) < Number(this.element.dataset.renderedAt)) event.preventDefault()
+  }
+
   // Redraws every copy of this comment's reactions, including cloned
   // discussions that don't receive Turbo Stream updates themselves.
   displayAll(commentId) {

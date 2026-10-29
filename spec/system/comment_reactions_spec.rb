@@ -125,6 +125,21 @@ RSpec.describe "Comment reactions", type: :system do
     expect(popover).to have_reaction("eyes", count: 1, pressed: false)
   end
 
+  it "ignores a replacement rendered before the chips on screen" do
+    popover = open_thread
+    target = ActionView::RecordIdentifier.dom_id(comment, :reactions)
+    stale = CoPlan::ApplicationController.render(partial: "coplan/comments/reactions", locals: { comment: comment })
+    create(:comment_reaction, comment: comment, user: sam, kind: "eyes")
+    CoPlan::Broadcaster.replace_to(plan, target: target, partial: "coplan/comments/reactions", locals: { comment: comment.reload })
+    expect(popover).to have_reaction("eyes", count: 1, pressed: false)
+
+    page.execute_script(<<~JS, target, stale)
+      window.Turbo.renderStreamMessage(`<turbo-stream action="replace" target="${arguments[0]}"><template>${arguments[1]}</template></turbo-stream>`)
+    JS
+    sleep 0.2
+    expect(popover).to have_reaction("eyes", count: 1, pressed: false)
+  end
+
   it "keeps working reaction controls in a cloned table discussion" do
     token_data = CoPlan::Plans::SourceTargets.new(plan.current_content).ranges.find { |kind, *| kind == "table_cell" }
     _, start, finish = token_data
