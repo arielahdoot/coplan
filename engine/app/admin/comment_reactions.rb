@@ -1,5 +1,8 @@
 ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
-  actions :index, :show, :destroy
+  # Read-only: removing a reaction here would leave open pages showing it.
+  # People remove their own reactions from the comment.
+  actions :index, :show
+  config.batch_actions = false
 
   filter :comment_id
   filter :user
@@ -7,7 +10,6 @@ ActiveAdmin.register CoPlan::CommentReaction, as: "CommentReaction" do
   filter :created_at
 
   index do
-    selectable_column
     id_column
     column :comment
     column :user
