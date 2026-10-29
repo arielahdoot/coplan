@@ -95,6 +95,17 @@ RSpec.describe "Comment reactions", type: :request do
     end
   end
 
+  it "refuses an unsupported format without saving or broadcasting" do
+    comment
+    expect(CoPlan::Broadcaster).not_to receive(:replace_to)
+
+    expect {
+      patch plan_comment_thread_comment_reactions_path(plan, thread_record, comment),
+        params: { kind: "thumbs_up", reacted: true }, headers: { "Accept" => "application/json" }
+    }.not_to change(CoPlan::CommentReaction, :count)
+    expect(response).to have_http_status(:not_acceptable)
+  end
+
   it "rejects reactions on a deleted comment" do
     comment.soft_delete!
 
