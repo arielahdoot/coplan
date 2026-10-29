@@ -33,6 +33,7 @@ module CoPlan
       end
 
       @comment.reactions.reset
+      ActiveRecord::Associations::Preloader.new(records: [ @comment ], associations: { reactions: :user }).call
       target = ActionView::RecordIdentifier.dom_id(@comment, :reactions)
       locals = { comment: @comment }
       Broadcaster.replace_to(@plan, target: target, partial: "coplan/comments/reactions", locals: locals)

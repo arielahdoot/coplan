@@ -44,6 +44,21 @@ RSpec.describe "Comment reactions", type: :request do
     expect(response).to have_http_status(:ok)
   end
 
+  it "loads reactor names without a query per reactor" do
+    user_queries = lambda do
+      count = 0
+      counter = ->(*, payload) { count += 1 if payload[:sql].match?(/FROM\s+[`"]?coplan_users\b/) }
+      ActiveSupport::Notifications.subscribed(counter, "sql.active_record") { react(kind: "eyes") }
+      count
+    end
+    create(:comment_reaction, comment: comment, user: alice, kind: "eyes")
+    react(kind: "eyes")
+    baseline = user_queries.call
+    3.times { create(:comment_reaction, comment: comment, user: create(:coplan_user), kind: "eyes") }
+
+    expect(user_queries.call).to eq(baseline)
+  end
+
   it "removes only the signed-in person's reaction" do
     create(:comment_reaction, comment: comment, user: bob, kind: "rocket")
     create(:comment_reaction, comment: comment, user: alice, kind: "rocket")
