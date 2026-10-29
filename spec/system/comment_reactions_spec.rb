@@ -252,7 +252,12 @@ RSpec.describe "Comment reactions", type: :system do
     popover.find(".comment-reactions__add").click
     expect(page).to have_css(".comment-reactions__picker:popover-open")
 
-    page.execute_script("document.querySelector('.thread-popover:popover-open .thread-popover__comments').dispatchEvent(new Event('scroll'))")
+    page.execute_script(<<~JS)
+      const comments = document.querySelector(".thread-popover:popover-open .thread-popover__comments")
+      comments.style.maxHeight = "60px"
+      comments.style.overflowY = "auto"
+      comments.scrollTop = 40
+    JS
 
     expect(page).to have_no_css(".comment-reactions__picker:popover-open")
     expect(page).to have_css(".thread-popover:popover-open")
@@ -510,6 +515,23 @@ RSpec.describe "Comment reactions", type: :system do
     visit plan_page_path(plan)
     find(".data-grid .source-thread-badge").click
     find(".source-comments", visible: true).tap { |panel| expect(panel).to have_text("Queued for how long?") }
+  end
+
+  it "closes the picker in a table discussion when the table scrolls" do
+    create_table_thread
+    panel = open_table_discussion
+    panel.find(".comment-reactions__add").click
+    expect(page).to have_css(".comment-reactions__picker:popover-open")
+
+    page.execute_script(<<~JS)
+      const frame = document.querySelector(".data-grid__frame")
+      frame.style.width = "160px"
+      frame.querySelector("table").style.minWidth = "800px"
+      frame.scrollLeft = 120
+    JS
+    expect(page.evaluate_script('document.querySelector(".data-grid__frame").scrollLeft')).to be > 0
+
+    expect(page).to have_no_css(".comment-reactions__picker:popover-open")
   end
 
   it "keeps working reaction controls in a cloned table discussion" do
